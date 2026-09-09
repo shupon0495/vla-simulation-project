@@ -16,6 +16,8 @@ PARTITION=your_partition ./slurm/submit_pipeline.sh
 `singularity/ubuntu24.04.def` から `singularity/ubuntu24.04.sif` を作成し、
 各段階を `singularity exec --fakeroot` で実行します。
 `DEF`, `SIF`, `CONTAINER` は環境変数で上書きできます。
+`CONTAINER` に既存の別イメージを指定した場合は `SIF` のビルドを省略します。
+また、`PROJECT` の外にある `DATA_DIR` や `UV_CACHE_DIR` もコンテナへ自動的に bind します。
 
 各 Slurm ジョブが呼び出す Python ファイルは次の通りです。
 
