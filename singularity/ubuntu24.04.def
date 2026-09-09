@@ -1,0 +1,43 @@
+Bootstrap: docker
+From: ubuntu:24.04
+
+%labels
+    Author "Your Name"
+    Description "Ubuntu 24.04 LTS base image with apt package lists updated at build time"
+
+%post
+    set -eux
+    export DEBIAN_FRONTEND=noninteractive
+
+    # Update APT package metadata when the SIF image is built.
+    apt-get update
+    apt-get install -y curl ffmpeg git unzip libgl1 libglib2.0-0 libsm6 \
+    libexpat1 libfontconfig1-dev libmagickwand-dev
+
+    # 使いやすいようにuvのダウンロード場所をlocalにしてシステム全体から触れるようにする
+    curl -LsSf https://astral.sh/uv/install.sh \
+        | env UV_UNMANAGED_INSTALL=/usr/local/bin sh
+    
+    # プロジェクトをcloneする
+    # git clone https://github.com/yourusername/yourproject.git
+    # cd opt/project
+    # pythonの依存をlockファイルから取得
+    # uv sync --locked
+
+    # キャッシュを削除
+    # apt-get clean
+    # rm -rf /var/lib/apt/lists/*
+    # rm -rf /root/.cache/uv
+
+%environment
+    export PATH="/usr/local/bin:$PATH"
+
+%test
+    grep -q 'Ubuntu 24.04' /etc/os-release
+    test -d /var/lib/apt/lists
+    # uv --version 
+    # /opt/project/.venv/bin/python --version
+
+%runscript
+    # cd /opt/project
+    exec /bin/bash "$@"
