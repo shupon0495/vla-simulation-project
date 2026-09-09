@@ -45,7 +45,7 @@ JOB3=$(sbatch --parsable \
     "$PROJECT/slurm/test.sh"
 )
 
-echo "Submitted jobs: $BUILD_JOB"
+echo "build:      $BUILD_JOB"
 echo "preprocess: $JOB1"
 echo "train:      $JOB2"
 echo "test:       $JOB3"
