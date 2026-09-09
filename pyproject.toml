@@ -1,0 +1,17 @@
+[project]
+name = "vla-simulation-source"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+authors = [
+    { name = "shupon0495", email = "shun2nakano057@gmail.com" }
+]
+requires-python = ">=3.12"
+dependencies = []
+
+[project.scripts]
+vla-simulation-source = "vla_simulation_source:main"
+
+[build-system]
+requires = ["uv_build>=0.12.10,<0.13.0"]
+build-backend = "uv_build"
