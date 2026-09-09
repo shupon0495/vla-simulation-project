@@ -1,11 +1,6 @@
 #!/bin/bash
 set -e
 
-PROJECT=/home/users/$USER/vla_simulation_source
-DEF=$PROJECT/singularity/ubuntu24.04.def
-SIF=$PROJECT/singularity/ubuntu24.04.sif
-LOG=$PROJECT/log
-
 # sifがないかdefのほうがsifより新しいときにdefを作成する
 # もしloginノード内でbuildをするのが禁止されていたらjobに変更するようにする
 if [ ! -f "$SIF" ] || [ "$DEF" -nt "$SIF" ]; then
