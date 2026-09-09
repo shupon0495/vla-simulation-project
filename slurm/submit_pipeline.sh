@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e # エラーで終了するように設定
 
-PROJECT=/home/users/$USER/vla_simulation_source
+export PROJECT=/home/users/$USER/vla-simulation-project
 source $PROJECT/slurm/config.sh
 
 # sifがないかdefのほうがsifより新しいときにdefを作成する
