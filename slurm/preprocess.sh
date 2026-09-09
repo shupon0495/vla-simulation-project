@@ -1,5 +1,4 @@
 #!/bin/bash
-#SBATCH --partition=ng-dgx-m2
 #SBATCH --job-name=preprocess
 #SBATCH --time=00:10:00
 #SBATCH --nodes=1
