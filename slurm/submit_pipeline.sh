@@ -8,7 +8,7 @@ source $PROJECT/slurm/config.sh
 # もしloginノード内でbuildをするのが禁止されていたらjobに変更するようにする
 if [ ! -f "$SIF" ] || [ "$DEF" -nt "$SIF" ]; then
     echo "Building Singularity image..."
-    $(sbatch --parsable \
+    BUILD_JOB=$(sbatch --parsable \
         --export="ALL,PROJECT=$PROJECT,LOG=$LOG" \
         --partition="$PPC_PARTITION" \
         --output="$LOG/build-%j.out" \
@@ -45,6 +45,7 @@ JOB3=$(sbatch --parsable \
     "$PROJECT/slurm/test.sh"
 )
 
+echo "Submitted jobs: $BUILD_JOB"
 echo "preprocess: $JOB1"
 echo "train:      $JOB2"
 echo "test:       $JOB3"
