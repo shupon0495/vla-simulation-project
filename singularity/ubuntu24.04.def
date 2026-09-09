@@ -18,11 +18,8 @@ From: ubuntu:24.04
     curl -LsSf https://astral.sh/uv/install.sh \
         | env UV_UNMANAGED_INSTALL=/usr/local/bin sh
     
-    # プロジェクトをcloneする
-    # git clone https://github.com/yourusername/yourproject.git
-    # cd opt/project
     # pythonの依存をlockファイルから取得
-    # uv sync --locked
+    uv sync --locked
 
     # キャッシュを削除
     # apt-get clean

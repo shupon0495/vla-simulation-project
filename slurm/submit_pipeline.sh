@@ -1,5 +1,8 @@
 #!/bin/bash
-set -e
+set -e # エラーで終了するように設定
+
+PROJECT=/home/users/$USER/vla_simulation_source
+source $PROJECT/slurm/config.sh
 
 # sifがないかdefのほうがsifより新しいときにdefを作成する
 # もしloginノード内でbuildをするのが禁止されていたらjobに変更するようにする
