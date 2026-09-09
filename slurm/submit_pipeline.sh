@@ -13,9 +13,9 @@ else
     echo "Singularity image is up to date."
 fi
 
-JOB1=$(sbatch --parsable --export=ALL, PROJECT=$PROJECT, LOG=$LOG $PROJECT/slurm/preprocess.sh)
-JOB2=$(sbatch --parsable --export=ALL, PROJECT=$PROJECT, LOG=$LOG --dependency=afterok:$JOB1 $PROJECT/slurm/train.sh)
-JOB3=$(sbatch --parsable --export=ALL, PROJECT=$PROJECT, LOG=$LOG --dependency=afterok:$JOB2 $PROJECT/slurm/test.sh)
+JOB1=$(sbatch --parsable --export=ALL,PROJECT=$PROJECT,LOG=$LOG $PROJECT/slurm/preprocess.sh)
+JOB2=$(sbatch --parsable --export=ALL,PROJECT=$PROJECT, LOG=$LOG --dependency=afterok:$JOB1 $PROJECT/slurm/train.sh)
+JOB3=$(sbatch --parsable --export=ALL,PROJECT=$PROJECT, LOG=$LOG --dependency=afterok:$JOB2 $PROJECT/slurm/test.sh)
 
 echo "preprocess: $JOB1"
 echo "train:      $JOB2"
