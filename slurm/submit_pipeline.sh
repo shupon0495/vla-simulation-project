@@ -8,7 +8,7 @@ source $PROJECT/slurm/config.sh
 # もしloginノード内でbuildをするのが禁止されていたらjobに変更するようにする
 if [ ! -f "$SIF" ] || [ "$DEF" -nt "$SIF" ]; then
     echo "Building Singularity image..."
-    singularity build --force "$SIF" "$DEF"
+    singularity build --fakeroot --force "$SIF" "$DEF"
 else
     echo "Singularity image is up to date."
 fi
