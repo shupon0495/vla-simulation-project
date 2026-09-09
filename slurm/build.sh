@@ -1,9 +1,8 @@
 #!/bin/bash
 #SBATCH --partition=ng-dgx-m2
-#SBATCH --job-name=preprocess
+#SBATCH --job-name=build
 #SBATCH --time=00:10:00
 #SBATCH --nodes=1
 #SBATCH --output=$LOG/slurm
 #SBATCH --error=$LOG/slurm
-
-singularity exec ubuntu24.04.sif uv run __init__.py
+singularity build --fakeroot --force "$SIF" "$DEF"
