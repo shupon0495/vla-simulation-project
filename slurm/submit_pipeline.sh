@@ -11,8 +11,8 @@ if [ ! -f "$SIF" ] || [ "$DEF" -nt "$SIF" ]; then
     $(sbatch --parsable \
         --export="ALL,PROJECT=$PROJECT,LOG=$LOG" \
         --partition="$PPC_PARTITION" \
-        --output="$LOG/slurm-%j.out" \
-        --error="$LOG/slurm-%j.err" \
+        --output="$LOG/build-%j.out" \
+        --error="$LOG/build-%j.err" \
         "$PROJECT/slurm/build.sh"
     )
 else
