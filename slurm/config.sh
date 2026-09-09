@@ -1,4 +1,12 @@
-export PROJECT=/home/users/$USER/vla_simulation_source
-export DEF=$PROJECT/singularity/ubuntu24.04.def
-export SIF=$PROJECT/singularity/ubuntu24.04.sif
-export LOG=$PROJECT/log
+#!/usr/bin/env bash
+export PROJECT="${PROJECT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
+export LOG="${LOG:-$PROJECT/log}"
+export DATA_DIR="${DATA_DIR:-$PROJECT/data}"
+export DEF="${DEF:-$PROJECT/singularity/ubuntu24.04.def}"
+export SIF="${SIF:-$PROJECT/singularity/ubuntu24.04.sif}"
+export PARTITION="${PARTITION:-NVGPU_HPC}"
+export TIME_LIMIT="${TIME_LIMIT:-00:30:00}"
+export CPUS_PER_TASK="${CPUS_PER_TASK:-4}"
+export MEMORY="${MEMORY:-16G}"
+export CONTAINER="${CONTAINER:-$SIF}"
+export UV_CACHE_DIR="${UV_CACHE_DIR:-$PROJECT/.uv-cache}"
