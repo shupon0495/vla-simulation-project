@@ -1,11 +1,16 @@
 #!/bin/bash
-set -e # エラーで終了するように設定
+set -euo pipefail
 
-export PROJECT=/home/users/$USER/vla-simulation-project
-source $PROJECT/slurm/config.sh
+SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+export PROJECT=${PROJECT:-$(cd "$SCRIPT_DIR/.." && pwd)}
+source "$PROJECT/slurm/config.sh"
+
+mkdir -p "$LOG"
 
 # sifがないかdefのほうがsifより新しいときにdefを作成する
 # もしloginノード内でbuildをするのが禁止されていたらjobに変更するようにする
+BUILD_JOB=""
+BUILD_DEPENDENCY=()
 if [ ! -f "$SIF" ] || [ "$DEF" -nt "$SIF" ]; then
     echo "Building Singularity image..."
     BUILD_JOB=$(sbatch --parsable \
@@ -15,6 +20,7 @@ if [ ! -f "$SIF" ] || [ "$DEF" -nt "$SIF" ]; then
         --error="$LOG/build-%j.err" \
         "$PROJECT/slurm/build.sh"
     )
+    BUILD_DEPENDENCY=(--dependency="afterok:$BUILD_JOB")
 else
     echo "Singularity image is up to date."
 fi
@@ -24,6 +30,7 @@ JOB1=$(sbatch --parsable \
     --partition="$PPC_PARTITION" \
     --output="$LOG/preprocess-%j.out" \
     --error="$LOG/preprocess-%j.err" \
+    "${BUILD_DEPENDENCY[@]}" \
     "$PROJECT/slurm/preprocess.sh"
 )
 
@@ -45,7 +52,7 @@ JOB3=$(sbatch --parsable \
     "$PROJECT/slurm/test.sh"
 )
 
-echo "build:      $BUILD_JOB"
+echo "build:      ${BUILD_JOB:-skipped}"
 echo "preprocess: $JOB1"
 echo "train:      $JOB2"
 echo "test:       $JOB3"
