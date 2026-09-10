@@ -6,7 +6,7 @@ import pytest
 from vla_simulation_project.artifacts import result_rows, validate_final_artifacts, write_json, write_parameter_csv, write_results_csv
 from vla_simulation_project.evaluate import build_eval_command
 from vla_simulation_project.paths import ProjectPaths
-from vla_simulation_project.prepare_assets import validate_assets
+from vla_simulation_project.prepare_assets import _extract_assets, _snapshot, tqdm, validate_assets
 from vla_simulation_project.preprocess import choose_evenly_spaced, normalize_task_name, select_spatial_episodes
 from vla_simulation_project.train import build_train_command
 from vla_simulation_project.config import SPATIAL_TASK_NAMES
@@ -75,3 +75,49 @@ def test_final_artifact_contract(tmp_path):
 def test_dependency_files_present_and_not_part_of_worktree_diff():
     root = Path(__file__).parents[1]
     for name in ("pyproject.toml", "uv.lock", "singularity/ubuntu24.04.def", "final_homework_Advanced.ipynb"): assert (root / name).is_file()
+
+def test_asset_preparation_uses_dedicated_python312_login_image():
+    root = Path(__file__).parents[1]
+    submit = (root / "submit_pipeline.sh").read_text()
+    login_def = (root / "singularity/login.def").read_text()
+    assert '"$LOGIN_SIF"' in submit
+    assert '"$PROJECT/.venv/bin/python" -m vla_simulation_project.main prepare-assets' in submit
+    assert "python3 -m vla_simulation_project.main prepare-assets" not in submit
+    assert "From: ubuntu:24.04" in login_def
+    assert "python3.12 -c 'import tomllib'" in login_def
+
+def test_slurm_log_paths_use_submission_timestamp():
+    submit = (Path(__file__).parents[1] / "submit_pipeline.sh").read_text()
+    for stage in ("build", "preprocess", "train", "test"):
+        assert f'{stage}-${{TIMESTAMP}}-%j.out' in submit
+        assert f'{stage}-${{TIMESTAMP}}-%j.err' in submit
+    assert "%Y-%m-%d" not in submit
+
+def test_snapshot_download_enables_progress_and_uses_resolved_revision(monkeypatch, tmp_path, capsys):
+    calls = {}
+    monkeypatch.setattr("vla_simulation_project.prepare_assets.HfApi.repo_info",
+        lambda *args, **kwargs: SimpleNamespace(sha="resolved-sha"))
+    monkeypatch.setattr("vla_simulation_project.prepare_assets.enable_progress_bars",
+        lambda: calls.setdefault("progress_enabled", True))
+    monkeypatch.setattr("vla_simulation_project.prepare_assets.snapshot_download",
+        lambda **kwargs: calls.update(kwargs) or str(tmp_path))
+
+    assert _snapshot("owner/data", "dataset", "fixed", tmp_path, allow=("*.parquet",)) == "resolved-sha"
+    assert calls["progress_enabled"] is True
+    assert calls["revision"] == "resolved-sha"
+    assert calls["local_dir"] == tmp_path
+    assert calls["allow_patterns"] == ["*.parquet"]
+    assert calls["tqdm_class"] is tqdm
+    assert "Preparing Hugging Face snapshot" in capsys.readouterr().out
+
+def test_asset_extraction_shows_byte_progress(tmp_path, capsys):
+    import zipfile
+    archive = tmp_path / "assets.zip"
+    with zipfile.ZipFile(archive, "w") as bundle:
+        bundle.writestr("bundle/assets/arena.xml", "x" * 32)
+
+    target = tmp_path / "libero/assets"
+    _extract_assets(archive, target)
+
+    assert (target / "arena.xml").read_text() == "x" * 32
+    assert "Extracting LIBERO assets" in capsys.readouterr().err

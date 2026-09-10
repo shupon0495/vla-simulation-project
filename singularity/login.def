@@ -1,0 +1,24 @@
+Bootstrap: docker
+From: ubuntu:24.04
+
+%labels
+    Description "Python 3.12 login-node image for offline asset preparation"
+
+%post
+    set -eux
+    export DEBIAN_FRONTEND=noninteractive
+
+    apt-get update
+    apt-get install -y --no-install-recommends ca-certificates python3.12-dev build-essential curl
+    curl -LsSf https://astral.sh/uv/install.sh \
+        | env UV_UNMANAGED_INSTALL=/usr/local/bin sh
+    rm -rf /var/lib/apt/lists/*
+
+%environment
+    PATH="/usr/local/bin:$PATH"
+
+%test
+    python3.12 -c 'import tomllib'
+
+%runscript
+    exec python3.12 "$@"
