@@ -3,4 +3,12 @@
 #SBATCH --time=00:10:00
 #SBATCH --nodes=1
 
-singularity exec $SIF uv run python src/main.py
+set -euo pipefail
+
+SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+export PROJECT=${PROJECT:-$(cd "$SCRIPT_DIR/.." && pwd)}
+source "$PROJECT/slurm/config.sh"
+
+cd "$PROJECT"
+singularity exec --bind "$PROJECT:$PROJECT" --pwd "$PROJECT" "$SIF" \
+    uv run python -m vla_simulation_project.main
