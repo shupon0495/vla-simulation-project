@@ -12,7 +12,8 @@ TIMESTAMP=$(date -u +%Y%m%dT%H%M%SZ)
 RUN_DIR="$PROJECT/data/outputs/${TIMESTAMP}-${RUN_ID}"
 mkdir -p "$RUN_DIR/manifests"
 export RUN_ID RUN_DIR
-uv run python -m vla_simulation_project.main prepare-assets
+singularity exec --bind "$PROJECT:$PROJECT" --pwd "$PROJECT" "$SIF" \
+    uv run python -m vla_simulation_project.main prepare-assets
 printf '{\n  "run_id": "%s",\n  "timestamp": "%s",\n  "run_dir": "%s",\n  "preprocess_job_id": null,\n  "train_job_id": null,\n  "test_job_id": null\n}\n' "$RUN_ID" "$TIMESTAMP" "$RUN_DIR" > "$RUN_DIR/manifests/run.json"
 
 # sifがないかdefのほうがsifより新しいときにdefを作成する
