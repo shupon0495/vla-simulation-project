@@ -12,15 +12,17 @@ dependencies = [
     "easydict==1.13",
     "future>=1.0.0",
     "gym==0.26.2",
+    "httpx>=0.28.1",
     "huggingface-hub>=1.0.0,<2.0.0",
     "ipython>=9.17.1",
     "ipywidgets>=8.1.9",
-    "lerobot==0.6.0",
+    "lerobot[peft,smolvla,training]",
     "libero",
     "matplotlib==3.10.8",
     "mujoco==3.7.0",
     "pandas>=2.0.0,<3.0.0",
     "peft>=0.18,<1.0.0",
+    "robosuite==1.4.1",
     "safetensors>=0.4.3,<1.0.0",
     "scikit-image==0.25.2",
     "torch>=2.7,<2.12.0",
@@ -37,3 +39,4 @@ build-backend = "uv_build"
 
 [tool.uv.sources]
 libero = { git = "https://github.com/sylvestf/LIBERO-plus.git", rev = "4976dc3" }
+lerobot = { git = "https://github.com/huggingface/lerobot.git", rev = "v0.6.0" }
