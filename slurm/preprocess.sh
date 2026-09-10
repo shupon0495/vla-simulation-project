@@ -11,4 +11,4 @@ source "$PROJECT/slurm/config.sh"
 
 cd "$PROJECT"
 singularity exec --bind "$PROJECT:$PROJECT" --pwd "$PROJECT" "$SIF" \
-    uv run python -m vla_simulation_project.main preprocess
+    uv run python -m vla_simulation_project.main
