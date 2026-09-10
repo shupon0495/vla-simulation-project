@@ -335,3 +335,14 @@ Report:
 * tests/checks run;
 * checks that could not be executed;
 * remaining assumptions.
+
+## Detailed documentation
+
+Before modifying a subsystem, read the relevant specification:
+
+- `docs/ARCHITECTURE.md` — execution and module architecture
+- `docs/NOTEBOOK_MAPPING.md` — mapping from notebook sections to implementation
+- `docs/OFFLINE_ASSETS.md` — offline model/dataset/asset requirements
+- `docs/ARTIFACT_CONTRACT.md` — required output files and manifests
+
+`AGENTS.md` and `TASK.md` take precedence if documentation conflicts.
