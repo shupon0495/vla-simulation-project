@@ -346,3 +346,5 @@ Before modifying a subsystem, read the relevant specification:
 - `docs/ARTIFACT_CONTRACT.md` — required output files and manifests
 
 `AGENTS.md` and `TASK.md` take precedence if documentation conflicts.
+
+`prepare-assets` is a login-node asset staging step, not a compute-runtime step; its implementation must not depend on launching the compute Singularity image.
