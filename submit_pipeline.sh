@@ -12,34 +12,34 @@ TIMESTAMP=$(date -u +%Y%m%dT%H%M%SZ)
 RUN_DIR="$PROJECT/data/outputs/${TIMESTAMP}-${RUN_ID}"
 mkdir -p "$RUN_DIR/manifests"
 export RUN_ID RUN_DIR
-singularity exec --bind "$PROJECT:$PROJECT" --pwd "$PROJECT" "$SIF" \
-    uv run python -m vla_simulation_project.main prepare-assets
 printf '{\n  "run_id": "%s",\n  "timestamp": "%s",\n  "run_dir": "%s",\n  "preprocess_job_id": null,\n  "train_job_id": null,\n  "test_job_id": null\n}\n' "$RUN_ID" "$TIMESTAMP" "$RUN_DIR" > "$RUN_DIR/manifests/run.json"
 
-# sifがないかdefのほうがsifより新しいときにdefを作成する
-# もしloginノード内でbuildをするのが禁止されていたらjobに変更するようにする
+# ログインノードでアセット準備を実行する前に、必要な Singularity イメージを作成する。
+# アセット準備には Internet 接続が必要なため、build ジョブの完了を待機し、
+# preprocess/train/test ジョブを投入する前に必ず完了させる。
 BUILD_JOB=""
-BUILD_DEPENDENCY=()
 if [ ! -f "$SIF" ] || [ "$DEF" -nt "$SIF" ]; then
     echo "Building Singularity image..."
-    BUILD_JOB=$(sbatch --parsable \
+    BUILD_JOB=$(sbatch --wait --parsable \
         --export="ALL,PROJECT=$PROJECT,LOG=$LOG,RUN_ID=$RUN_ID,RUN_DIR=$RUN_DIR" \
         --partition="$PPC_PARTITION" \
         --output="$LOG/build-%j-%Y-%m-%d.out" \
         --error="$LOG/build-%j-%Y-%m-%d.err" \
         "$PROJECT/slurm/build.sh"
     )
-    BUILD_DEPENDENCY=(--dependency="afterok:$BUILD_JOB")
 else
     echo "Singularity image is up to date."
 fi
+
+echo "Preparing offline assets..."
+singularity exec --bind "$PROJECT:$PROJECT" --pwd "$PROJECT" "$SIF" \
+    uv run python -m vla_simulation_project.main prepare-assets
 
 JOB1=$(sbatch --parsable \
     --export="ALL,PROJECT=$PROJECT,LOG=$LOG,RUN_ID=$RUN_ID,RUN_DIR=$RUN_DIR" \
     --partition="$PPC_PARTITION" \
     --output="$LOG/preprocess-%j-%Y-%m-%d.out" \
     --error="$LOG/preprocess-%j-%Y-%m-%d.err" \
-    "${BUILD_DEPENDENCY[@]}" \
     "$PROJECT/slurm/preprocess.sh"
 )
 
