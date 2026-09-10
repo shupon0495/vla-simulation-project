@@ -12,6 +12,10 @@ Asset preparation occurs on the Internet-connected login node.
 `singularity/login.sif`.  It does not use the login node's system Python and it
 does not launch the compute image.
 
+Hugging Face repositories are staged with `huggingface_hub.snapshot_download`.
+Its file and byte progress indicators are kept enabled so long dataset transfers
+remain observable from the submission terminal.
+
 ---
 
 ## Principle

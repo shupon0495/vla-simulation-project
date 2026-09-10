@@ -85,8 +85,9 @@ The login-node preparation phase must complete before preprocess/train/test jobs
 
 Asset preparation runs in the dedicated `singularity/login.sif`, built from
 `singularity/login.def`.  This keeps it independent of both the login node's
-system Python version and the compute image.  The image supplies Python 3.12;
-the preparation implementation itself remains standard-library-only.
+system Python version and the compute image. The project uv environment supplies
+`huggingface_hub`, whose snapshot progress indicators are shown while assets are
+downloaded.
 
 ### Compute node
 

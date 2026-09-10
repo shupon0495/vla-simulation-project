@@ -1,7 +1,12 @@
-"""Login-node preparation implemented with the Python standard library only."""
+"""Download and validate assets on the Internet-connected login node."""
 from __future__ import annotations
-import json, os, shutil, urllib.parse, urllib.request, zipfile
+import shutil, zipfile
 from pathlib import Path
+
+from huggingface_hub import HfApi, snapshot_download
+from huggingface_hub.utils import enable_progress_bars
+from tqdm.auto import tqdm
+
 from .artifacts import read_json, write_json
 from .config import (BASE_MODEL_REPO, BASE_MODEL_REVISION, DATASET_REPO, DATASET_REVISION,
                      LIBERO_ASSETS_REPO, VLM_REPO)
@@ -35,39 +40,21 @@ def validate_assets(paths: ProjectPaths) -> dict:
     if not _valid_assets(local): raise FileNotFoundError(f"missing/invalid LIBERO-plus assets at {local}; rerun prepare-assets on the login node")
     return lock
 
-def _request_json(url: str) -> dict:
-    headers = {"User-Agent": "vla-simulation-project/asset-preparer"}
-    token = os.environ.get("HF_TOKEN") or os.environ.get("HUGGING_FACE_HUB_TOKEN")
-    if token: headers["Authorization"] = f"Bearer {token}"
-    with urllib.request.urlopen(urllib.request.Request(url, headers=headers)) as response: return json.load(response)
-
-def _repo_info(repo: str, repo_type: str, revision: str | None) -> dict:
-    kind = "datasets" if repo_type == "dataset" else "models"
-    suffix = f"/revision/{urllib.parse.quote(revision, safe='')}" if revision else ""
-    return _request_json(f"https://huggingface.co/api/{kind}/{repo}{suffix}")
-
-def _download(url: str, target: Path) -> None:
-    target.parent.mkdir(parents=True, exist_ok=True); temporary = target.with_suffix(target.suffix + ".partial")
-    headers = {"User-Agent": "vla-simulation-project/asset-preparer"}
-    token = os.environ.get("HF_TOKEN") or os.environ.get("HUGGING_FACE_HUB_TOKEN")
-    if token: headers["Authorization"] = f"Bearer {token}"
-    try:
-        with urllib.request.urlopen(urllib.request.Request(url, headers=headers)) as source, temporary.open("wb") as output: shutil.copyfileobj(source, output)
-        temporary.replace(target)
-    finally:
-        if temporary.exists(): temporary.unlink()
-
 def _snapshot(repo: str, repo_type: str, revision: str | None, target: Path, *, allow=None, ignore=None) -> str:
-    info = _repo_info(repo, repo_type, revision); resolved = info["sha"]
-    for sibling in info.get("siblings", []):
-        name = sibling["rfilename"]
-        if allow and not any(Path(name).match(pattern) for pattern in allow): continue
-        if ignore and any(Path(name).match(pattern) for pattern in ignore): continue
-        destination = target / name
-        expected_size = sibling.get("size") or sibling.get("lfs", {}).get("size")
-        if destination.is_file() and destination.stat().st_size and (not expected_size or destination.stat().st_size == expected_size): continue
-        encoded = "/".join(urllib.parse.quote(part, safe="") for part in name.split("/"))
-        _download(f"https://huggingface.co/{'datasets/' if repo_type == 'dataset' else ''}{repo}/resolve/{resolved}/{encoded}?download=true", destination)
+    """Download one immutable Hub snapshot with visible file/byte progress bars."""
+    resolved = HfApi().repo_info(repo_id=repo, repo_type=repo_type, revision=revision).sha
+    print(f"Preparing Hugging Face snapshot: {repo}@{resolved} -> {target}", flush=True)
+    enable_progress_bars()
+    snapshot_download(
+        repo_id=repo,
+        repo_type=repo_type,
+        revision=resolved,
+        local_dir=target,
+        allow_patterns=list(allow) if allow else None,
+        ignore_patterns=list(ignore) if ignore else None,
+        tqdm_class=tqdm,
+    )
+    print(f"Hugging Face snapshot ready: {repo}@{resolved}", flush=True)
     return resolved
 
 def _extract_assets(archive: Path, target: Path) -> None:
@@ -97,13 +84,15 @@ def prepare_assets() -> None:
     if not vlm_revision: raise RuntimeError("valid VLM files exist but assets.lock.json has no resolved revision; move the managed VLM directory aside and rerun preparation")
     assets = paths.data / "assets/libero_plus/assets"
     assets_revision = existing.get("libero_assets", {}).get("revision")
-    if not assets_revision: assets_revision = _repo_info(LIBERO_ASSETS_REPO, "dataset", None)["sha"]
     if not _valid_assets(assets):
-        archive = paths.data / "assets/libero_plus/assets.zip"
-        info = _repo_info(LIBERO_ASSETS_REPO, "dataset", assets_revision); assets_revision = info["sha"]
-        if not archive.is_file() or not archive.stat().st_size:
-            _download(f"https://huggingface.co/datasets/{LIBERO_ASSETS_REPO}/resolve/{assets_revision}/assets.zip?download=true", archive)
+        archive_root = paths.data / "assets/libero_plus"
+        archive = archive_root / "assets.zip"
+        assets_revision = _snapshot(
+            LIBERO_ASSETS_REPO, "dataset", assets_revision, archive_root, allow=("assets.zip",)
+        )
         _extract_assets(archive, assets)
+    elif not assets_revision:
+        assets_revision = HfApi().repo_info(repo_id=LIBERO_ASSETS_REPO, repo_type="dataset").sha
     lock = {"base_model": {"repo": BASE_MODEL_REPO, "revision": BASE_MODEL_REVISION, "local_path": _relative(paths, base)},
             "dataset": {"repo": DATASET_REPO, "revision": DATASET_REVISION, "local_path": _relative(paths, dataset)},
             "vlm": {"repo": VLM_REPO, "revision": vlm_revision, "local_path": _relative(paths, vlm)},
