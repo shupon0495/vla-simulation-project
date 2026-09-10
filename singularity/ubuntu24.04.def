@@ -19,7 +19,7 @@ From: ubuntu:24.04
         | env UV_UNMANAGED_INSTALL=/usr/local/bin sh
 
 %environment
-    export PATH="$HOME/local/bin:$PATH"
+    export PATH="/usr/local/bin:$PATH"
 
 %test
     grep -q 'Ubuntu 24.04' /etc/os-release
