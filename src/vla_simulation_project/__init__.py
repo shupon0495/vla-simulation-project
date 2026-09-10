@@ -1,2 +1,5 @@
 def main() -> None:
-    print("Hello from vla-simulation-source!")
+    from .main import main as dispatch
+    dispatch()
+
+__all__ = ["main"]
