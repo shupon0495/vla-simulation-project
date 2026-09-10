@@ -2,7 +2,7 @@
 set -euo pipefail
 
 SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
-export PROJECT=${PROJECT:-$(cd "$SCRIPT_DIR/.." && pwd)}
+export PROJECT=${PROJECT:-$SCRIPT_DIR}
 source "$PROJECT/slurm/config.sh"
 
 mkdir -p "$LOG"
