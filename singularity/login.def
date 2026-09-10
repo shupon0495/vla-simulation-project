@@ -1,0 +1,19 @@
+Bootstrap: docker
+From: ubuntu:24.04
+
+%labels
+    Description "Python 3.12 login-node image for offline asset preparation"
+
+%post
+    set -eux
+    export DEBIAN_FRONTEND=noninteractive
+
+    apt-get update
+    apt-get install -y --no-install-recommends ca-certificates python3.12
+    rm -rf /var/lib/apt/lists/*
+
+%test
+    python3.12 -c 'import tomllib'
+
+%runscript
+    exec python3.12 "$@"

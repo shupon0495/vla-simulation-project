@@ -7,16 +7,28 @@ source "$PROJECT/slurm/config.sh"
 
 mkdir -p "$LOG"
 
-# Asset preparation deliberately runs with the login node's system Python.  It
-# uses only the standard library, so no compute-architecture venv or SIF is
-# created/executed here.
 RUN_ID=$(date +%s%N | sha256sum | cut -c1-10)
 TIMESTAMP=$(date -u +%Y%m%dT%H%M%SZ)
 RUN_DIR="$PROJECT/data/outputs/${TIMESTAMP}-${RUN_ID}"
 export RUN_ID TIMESTAMP RUN_DIR
 mkdir -p "$RUN_DIR/manifests"
-PYTHONPATH="$PROJECT/src${PYTHONPATH:+:$PYTHONPATH}" \
-    python3 -m vla_simulation_project.main prepare-assets
+
+# The login node's system Python may be 3.9, while the project requires 3.12.
+# Build and run a small, login-only image before submitting any Slurm job.  This
+# image is intentionally separate from the compute image managed by build.sh.
+if [ ! -f "$LOGIN_SIF" ] || [ "$LOGIN_DEF" -nt "$LOGIN_SIF" ]; then
+    echo "Building login-node asset preparation image..."
+    singularity build --fakeroot --force "$LOGIN_SIF" "$LOGIN_DEF"
+else
+    echo "Login-node asset preparation image is up to date."
+fi
+
+singularity exec \
+    --bind "$PROJECT:$PROJECT" \
+    --pwd "$PROJECT" \
+    --env "PROJECT=$PROJECT,RUN_ID=$RUN_ID,RUN_DIR=$RUN_DIR,PYTHONPATH=$PROJECT/src" \
+    "$LOGIN_SIF" \
+    python3.12 -m vla_simulation_project.main prepare-assets
 printf '{\n  "run_id": "%s",\n  "timestamp": "%s",\n  "run_dir": "%s",\n  "build_job_id": null,\n  "preprocess_job_id": null,\n  "train_job_id": null,\n  "test_job_id": null\n}\n' \
     "$RUN_ID" "$TIMESTAMP" "$RUN_DIR" > "$RUN_DIR/manifests/run.json"
 

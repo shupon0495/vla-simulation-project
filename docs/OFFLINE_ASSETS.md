@@ -8,6 +8,10 @@ This document defines every external artifact that must be available locally bef
 
 Asset preparation occurs on the Internet-connected login node.
 
+`submit_pipeline.sh` executes preparation in the dedicated login-node image
+`singularity/login.sif`.  It does not use the login node's system Python and it
+does not launch the compute image.
+
 ---
 
 ## Principle
@@ -232,4 +236,3 @@ the stage must fail with a message identifying:
 Compute-stage code must not attempt to repair the problem by downloading the resource.
 
 ---
-

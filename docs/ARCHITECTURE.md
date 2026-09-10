@@ -27,7 +27,9 @@ Login node
         |
         +-- create RUN_ID and timestamp
         |
-        +-- prepare/check offline assets
+        +-- build/reuse login.sif
+        |
+        +-- prepare/check offline assets in login.sif
         |
         +-- optional build.sh
         |
@@ -80,6 +82,11 @@ Responsibilities:
 * submit Slurm jobs.
 
 The login-node preparation phase must complete before preprocess/train/test jobs are submitted.
+
+Asset preparation runs in the dedicated `singularity/login.sif`, built from
+`singularity/login.def`.  This keeps it independent of both the login node's
+system Python version and the compute image.  The image supplies Python 3.12;
+the preparation implementation itself remains standard-library-only.
 
 ### Compute node
 
@@ -365,4 +372,3 @@ A failure must propagate as a non-zero process exit code.
 
 
 ---
-

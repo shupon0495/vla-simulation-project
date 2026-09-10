@@ -75,3 +75,13 @@ def test_final_artifact_contract(tmp_path):
 def test_dependency_files_present_and_not_part_of_worktree_diff():
     root = Path(__file__).parents[1]
     for name in ("pyproject.toml", "uv.lock", "singularity/ubuntu24.04.def", "final_homework_Advanced.ipynb"): assert (root / name).is_file()
+
+def test_asset_preparation_uses_dedicated_python312_login_image():
+    root = Path(__file__).parents[1]
+    submit = (root / "submit_pipeline.sh").read_text()
+    login_def = (root / "singularity/login.def").read_text()
+    assert '"$LOGIN_SIF"' in submit
+    assert "python3.12 -m vla_simulation_project.main prepare-assets" in submit
+    assert "python3 -m vla_simulation_project.main prepare-assets" not in submit
+    assert "From: ubuntu:24.04" in login_def
+    assert "python3.12 -c 'import tomllib'" in login_def
