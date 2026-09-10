@@ -1,0 +1,18 @@
+[training]
+steps = 3000
+batch_size = 1
+learning_rate = 3e-4
+final_learning_rate = 3e-5
+warmup_steps = 100
+lora_r = 16
+lora_alpha = 16
+log_freq = 100
+seed = 42
+
+[evaluation]
+task_ids = [0, 4, 8]
+episodes_per_task = 1
+seed = 2026
+
+[evaluation.video]
+task_id = 0
