@@ -1,5 +1,5 @@
 [project]
-name = "vla-simulation-source"
+name = "vla-simulation-project"
 version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
@@ -10,7 +10,7 @@ requires-python = ">=3.12"
 dependencies = []
 
 [project.scripts]
-vla-simulation-source = "vla_simulation_source:main"
+vla-simulation-project = "vla_simulation_project:main"
 
 [build-system]
 requires = ["uv_build>=0.12.10,<0.13.0"]
