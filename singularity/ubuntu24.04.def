@@ -12,7 +12,7 @@ From: ubuntu:24.04
     # Update APT package metadata when the SIF image is built.
     apt-get update
     apt-get install -y curl ffmpeg git unzip libgl1 libglib2.0-0 libsm6 \
-    libexpat1 libfontconfig1-dev libmagickwand-dev
+    libexpat1 libfontconfig1-dev libmagickwand-dev build-essential python3.12-dev
 
     # 使いやすいようにuvのダウンロード場所をlocalにしてシステム全体から触れるようにする
     curl -LsSf https://astral.sh/uv/install.sh \
