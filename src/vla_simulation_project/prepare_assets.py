@@ -71,7 +71,7 @@ def _tokenizer_config_is_local(base: Path, vlm_path: str) -> bool:
         elif isinstance(value, list): pending.extend(value)
     return bool(values) and all(value == vlm_path for value in values)
 
-def validate_assets(paths: ProjectPaths) -> dict:
+def validate_assets(paths: ProjectPaths, *, repair_tokenizer: bool = False) -> dict:
     lock_path = paths.data / "manifests" / LOCK_NAME
     if not lock_path.is_file(): raise FileNotFoundError(f"offline asset lock missing at {lock_path}; run prepare-assets on the Internet-connected login node")
     lock = read_json(lock_path)
@@ -84,6 +84,11 @@ def validate_assets(paths: ProjectPaths) -> dict:
             raise FileNotFoundError(f"missing/invalid offline {key} for {repo}@{revision or item.get('revision')} at {local}; rerun prepare-assets on the login node")
     base_path = paths.project / lock["base_model"]["local_path"]
     vlm_path = lock["vlm"]["local_path"]
+    if repair_tokenizer and not _tokenizer_config_is_local(base_path, vlm_path):
+        managed_models = (paths.data / "models").resolve()
+        if base_path.resolve() != managed_models and managed_models not in base_path.resolve().parents:
+            raise ValueError(f"refusing to modify tokenizer config outside {managed_models}: {base_path}")
+        _localize_tokenizer_config(base_path, vlm_path)
     if not _tokenizer_config_is_local(base_path, vlm_path):
         raise FileNotFoundError(
             f"offline tokenizer path is not localized to {vlm_path} in {base_path / 'policy_preprocessor.json'}; "
@@ -163,4 +168,4 @@ def prepare_assets() -> None:
             "dataset": {"repo": DATASET_REPO, "revision": DATASET_REVISION, "local_path": _relative(paths, dataset)},
             "vlm": {"repo": VLM_REPO, "revision": vlm_revision, "local_path": _relative(paths, vlm)},
             "libero_assets": {"repo": LIBERO_ASSETS_REPO, "revision": assets_revision, "local_path": _relative(paths, assets)}}
-    write_json(lock_path, lock); validate_assets(paths)
+    write_json(lock_path, lock); validate_assets(paths, repair_tokenizer=True)

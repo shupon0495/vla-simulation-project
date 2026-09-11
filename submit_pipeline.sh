@@ -62,6 +62,7 @@ JOB1=$(sbatch --parsable \
     --partition="$PPC_PARTITION" \
     --output="$LOG/preprocess-${TIMESTAMP}-%j.out" \
     --error="$LOG/preprocess-${TIMESTAMP}-%j.err" \
+    --nv \
     "${BUILD_DEPENDENCY[@]}" \
     "$PROJECT/slurm/preprocess.sh"
 )
@@ -72,6 +73,7 @@ JOB2=$(sbatch --parsable \
     --output="$LOG/train-${TIMESTAMP}-%j.out" \
     --error="$LOG/train-${TIMESTAMP}-%j.err" \
     --dependency="afterok:$JOB1" \
+    --nv \
     "$PROJECT/slurm/train.sh"
 )
 
@@ -81,6 +83,7 @@ JOB3=$(sbatch --parsable \
     --output="$LOG/test-${TIMESTAMP}-%j.out" \
     --error="$LOG/test-${TIMESTAMP}-%j.err" \
     --dependency="afterok:$JOB2" \
+    --nv \
     "$PROJECT/slurm/test.sh"
 )
 
