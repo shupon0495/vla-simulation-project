@@ -10,7 +10,12 @@ From: ubuntu:24.04
 
     apt-get update
     apt-get install -y --no-install-recommends ca-certificates python3.12
+    curl -LsSf https://astral.sh/uv/install.sh \
+        | env UV_UNMANAGED_INSTALL=/usr/local/bin sh
     rm -rf /var/lib/apt/lists/*
+
+%environment
+    PATH="/usr/local/bin:$PATH"
 
 %test
     python3.12 -c 'import tomllib'
