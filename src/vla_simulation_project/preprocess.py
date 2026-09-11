@@ -3,7 +3,7 @@ import json, re
 from collections import defaultdict
 from pathlib import Path
 from .artifacts import write_json
-from .config import DATASET_REPO, DATASET_REVISION, SPATIAL_TASK_NAMES
+from .config import DATASET_REPO, DATASET_REVISION, LIBERO_SOURCE_REPO, LIBERO_SOURCE_REVISION, SPATIAL_TASK_NAMES
 from .paths import ProjectPaths, ensure_run_layout
 from .prepare_assets import validate_assets
 
@@ -55,4 +55,6 @@ def preprocess() -> None:
         "dataset_revision": DATASET_REVISION, "selected_episode_indices": indices, "selected_episode_count": len(indices),
         "selected_by_task": selected, "base_model_path": lock["base_model"]["local_path"],
         "dataset_path": lock["dataset"]["local_path"], "vlm_path": lock["vlm"]["local_path"],
-        "resolved_vlm_revision": lock["vlm"]["revision"], "libero_assets_path": lock["libero_assets"]["local_path"]})
+        "resolved_vlm_revision": lock["vlm"]["revision"], "libero_assets_path": lock["libero_assets"]["local_path"],
+        "libero_source_repo": LIBERO_SOURCE_REPO, "libero_source_revision": LIBERO_SOURCE_REVISION,
+        "libero_source_path": lock["libero_source"]["local_path"]})

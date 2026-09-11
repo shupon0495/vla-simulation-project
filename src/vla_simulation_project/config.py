@@ -9,6 +9,9 @@ DATASET_REPO = "lerobot/libero_plus"
 DATASET_REVISION = "f3f49f426d75030177b18778374005bc12ccd588"
 VLM_REPO = "HuggingFaceTB/SmolVLM2-500M-Video-Instruct"
 LIBERO_ASSETS_REPO = "Sylvest/LIBERO-plus"
+LIBERO_SOURCE_REPO = "https://github.com/sylvestf/LIBERO-plus.git"
+# This is the full commit recorded for the ``4976dc3`` revision in uv.lock.
+LIBERO_SOURCE_REVISION = "4976dc30028e805ff8094b55501d532c48fec182"
 SUITES = ("libero_spatial", "libero_object", "libero_goal", "libero_10")
 SPATIAL_TASK_NAMES = (
     "pick up the black bowl from table center and place it on the plate",

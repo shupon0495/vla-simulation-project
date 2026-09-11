@@ -121,13 +121,32 @@ Evaluation must not attempt to retrieve them from the Internet.
 
 ---
 
+## LIBERO-plus benchmark resources
+
+The LIBERO-plus Python package remains managed by `uv.lock`. Its benchmark
+resources are staged separately because a package wheel can omit non-Python
+directories required by evaluation.
+
+On the Internet-connected login node, `prepare-assets` clones:
+
+```text
+https://github.com/sylvestf/LIBERO-plus.git
+4976dc30028e805ff8094b55501d532c48fec182
+```
+
+to `data/assets/libero_plus/source/`. It verifies `git rev-parse HEAD` is
+exactly that full commit, validates `libero/libero/bddl_files` and
+`libero/libero/init_files`, and links the source tree's legacy `assets` path to
+the separately staged external assets. Compute stages only inspect this local
+tree; they never clone, fetch, or install it.
+
 ## Source packages
 
 The following are NOT downloaded by `prepare_assets.py`:
 
 ```text
 LeRobot v0.6.0
-LIBERO-plus 4976dc3
+LIBERO-plus Python package 4976dc3
 ```
 
 They are provided by the existing uv environment.
@@ -165,6 +184,11 @@ Suggested format:
   },
   "libero_assets": {
     "local_path": "data/assets/..."
+  },
+  "libero_source": {
+    "repo": "https://github.com/sylvestf/LIBERO-plus.git",
+    "revision": "4976dc30028e805ff8094b55501d532c48fec182",
+    "local_path": "data/assets/libero_plus/source"
   }
 }
 ```
@@ -186,6 +210,7 @@ Before submitting Slurm jobs, verify at minimum:
 * VLM weights, configuration, and tokenizer files exist;
 * the pretrained policy processor's `tokenizer_name` points to the staged local VLM path;
 * LIBERO assets exist;
+* LIBERO-plus benchmark source exists at its locked commit, with BDDL and init-state directories;
 * the lock manifest matches expected fixed revisions.
 
 Do not treat an empty directory as a valid cached artifact.
