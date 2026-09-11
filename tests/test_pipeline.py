@@ -4,13 +4,13 @@ from pathlib import Path
 from types import SimpleNamespace
 import pytest
 from vla_simulation_project.artifacts import result_rows, validate_final_artifacts, write_json, write_parameter_csv, write_results_csv
-from vla_simulation_project.evaluate import build_eval_command
+from vla_simulation_project.evaluate import build_eval_command, create_libero_config
 from vla_simulation_project.paths import ProjectPaths
 from vla_simulation_project.prepare_assets import (_extract_assets, _localize_tokenizer_config,
-                                                   _snapshot, tqdm, validate_assets)
+                                                   _link_libero_assets, _snapshot, tqdm, validate_assets)
 from vla_simulation_project.preprocess import choose_evenly_spaced, normalize_task_name, select_spatial_episodes
 from vla_simulation_project.train import build_train_command
-from vla_simulation_project.config import SPATIAL_TASK_NAMES
+from vla_simulation_project.config import LIBERO_SOURCE_REPO, LIBERO_SOURCE_REVISION, SPATIAL_TASK_NAMES
 
 def config():
     return SimpleNamespace(steps=3000, batch_size=1, learning_rate=.0003, final_learning_rate=.00003,
@@ -32,7 +32,15 @@ def test_normalization_and_deterministic_selection():
     first = select_spatial_episodes(tasks); second = select_spatial_episodes(tasks)
     assert first == second and len(first[0]) == 50
 
-def test_asset_manifest_validation_and_missing_failure(tmp_path):
+def _prepared_libero_source(tmp_path, assets):
+    source = tmp_path / "data/assets/libero_plus/source"
+    resources = source / "libero/libero"
+    (resources / "bddl_files").mkdir(parents=True)
+    (resources / "init_files").mkdir()
+    (resources / "assets").symlink_to(assets)
+    return source
+
+def test_asset_manifest_validation_and_missing_failure(monkeypatch, tmp_path):
     paths = ProjectPaths(tmp_path)
     with pytest.raises(FileNotFoundError, match="login node"): validate_assets(paths)
     base = tmp_path / "data/models/base"; dataset = tmp_path / "data/datasets/set"; vlm = tmp_path / "data/models/vlm"; assets = tmp_path / "data/assets/libero/assets"
@@ -42,10 +50,13 @@ def test_asset_manifest_validation_and_missing_failure(tmp_path):
     (dataset / "meta/info.json").write_text("x"); (dataset / "data/a.parquet").write_text("x"); (dataset / "videos/a.mp4").write_text("x")
     for name in ("config.json", "model.safetensors", "tokenizer_config.json", "tokenizer.json"): (vlm / name).write_text("x")
     (assets / "arena.xml").write_text("x")
+    source = _prepared_libero_source(tmp_path, assets)
+    monkeypatch.setattr("vla_simulation_project.prepare_assets._source_revision", lambda _: LIBERO_SOURCE_REVISION)
     from vla_simulation_project.config import BASE_MODEL_REPO, BASE_MODEL_REVISION, DATASET_REPO, DATASET_REVISION, VLM_REPO
     write_json(tmp_path / "data/manifests/assets.lock.json", {"base_model": {"repo": BASE_MODEL_REPO, "revision": BASE_MODEL_REVISION, "local_path": "data/models/base"},
         "dataset": {"repo": DATASET_REPO, "revision": DATASET_REVISION, "local_path": "data/datasets/set"},
-        "vlm": {"repo": VLM_REPO, "revision": "abc", "local_path": "data/models/vlm"}, "libero_assets": {"local_path": "data/assets/libero/assets"}})
+        "vlm": {"repo": VLM_REPO, "revision": "abc", "local_path": "data/models/vlm"}, "libero_assets": {"local_path": "data/assets/libero/assets"},
+        "libero_source": {"repo": LIBERO_SOURCE_REPO, "revision": LIBERO_SOURCE_REVISION, "local_path": str(source.relative_to(tmp_path))}})
     assert validate_assets(paths)["vlm"]["revision"] == "abc"
 
 def test_localize_tokenizer_config_uses_staged_vlm_path(tmp_path):
@@ -59,7 +70,7 @@ def test_localize_tokenizer_config_uses_staged_vlm_path(tmp_path):
     localized = json.loads(config_path.read_text())
     assert localized["steps"][0]["config"]["tokenizer_name"] == "data/models/smolvlm2_500m"
 
-def test_asset_validation_can_repair_remote_tokenizer_reference(tmp_path):
+def test_asset_validation_can_repair_remote_tokenizer_reference(monkeypatch, tmp_path):
     paths = ProjectPaths(tmp_path)
     base = tmp_path / "data/models/base"; dataset = tmp_path / "data/datasets/set"
     vlm = tmp_path / "data/models/vlm"; assets = tmp_path / "data/assets/libero/assets"
@@ -73,17 +84,37 @@ def test_asset_validation_can_repair_remote_tokenizer_reference(tmp_path):
     for name in ("config.json", "model.safetensors", "tokenizer_config.json", "tokenizer.json"):
         (vlm / name).write_text("x")
     (assets / "arena.xml").write_text("x")
+    source = _prepared_libero_source(tmp_path, assets)
+    monkeypatch.setattr("vla_simulation_project.prepare_assets._source_revision", lambda _: LIBERO_SOURCE_REVISION)
     from vla_simulation_project.config import BASE_MODEL_REPO, BASE_MODEL_REVISION, DATASET_REPO, DATASET_REVISION, VLM_REPO
     write_json(tmp_path / "data/manifests/assets.lock.json", {
         "base_model": {"repo": BASE_MODEL_REPO, "revision": BASE_MODEL_REVISION, "local_path": "data/models/base"},
         "dataset": {"repo": DATASET_REPO, "revision": DATASET_REVISION, "local_path": "data/datasets/set"},
         "vlm": {"repo": VLM_REPO, "revision": "abc", "local_path": "data/models/vlm"},
         "libero_assets": {"local_path": "data/assets/libero/assets"},
+        "libero_source": {"repo": LIBERO_SOURCE_REPO, "revision": LIBERO_SOURCE_REVISION, "local_path": str(source.relative_to(tmp_path))},
     })
 
     validate_assets(paths, repair_tokenizer=True)
 
     assert json.loads(processor.read_text())["steps"][0]["config"]["tokenizer_name"] == "data/models/vlm"
+
+def test_libero_config_uses_prepared_source_resources(tmp_path):
+    assets = tmp_path / "assets"; assets.mkdir()
+    source = _prepared_libero_source(tmp_path, assets)
+    config = create_libero_config(tmp_path / "run", source, assets)
+    text = (config / "config.yaml").read_text()
+    assert f"bddl_files: {source / 'libero/libero/bddl_files'}" in text
+    assert f"init_states: {source / 'libero/libero/init_files'}" in text
+    assert f"assets: {assets}" in text
+
+def test_libero_source_assets_link_replaces_checkout_placeholder(tmp_path):
+    assets = tmp_path / "assets"; assets.mkdir()
+    source = _prepared_libero_source(tmp_path, assets)
+    link = source / "libero/libero/assets"
+    link.unlink(); link.mkdir(); (link / "placeholder.xml").write_text("x")
+    _link_libero_assets(source, assets)
+    assert link.is_symlink() and link.resolve() == assets.resolve()
 
 def test_train_and_eval_commands_are_local_and_semantic(tmp_path):
     pre = {"base_model_path": "data/models/base", "vlm_path": "data/models/vlm", "dataset_path": "data/datasets/set", "selected_episode_indices": [1, 3]}
@@ -122,7 +153,7 @@ def test_asset_preparation_uses_dedicated_python312_login_image():
     submit = (root / "submit_pipeline.sh").read_text()
     login_def = (root / "singularity/login.def").read_text()
     assert '"$LOGIN_SIF"' in submit
-    assert '"$PROJECT/.venv/bin/python" -m vla_simulation_project.main prepare-assets' in submit
+    assert "uv run --frozen python -m vla_simulation_project.main prepare-assets" in submit
     assert "python3 -m vla_simulation_project.main prepare-assets" not in submit
     assert "From: ubuntu:24.04" in login_def
     assert "python3.12 -c 'import tomllib'" in login_def

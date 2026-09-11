@@ -5,7 +5,7 @@ from pathlib import Path
 from .artifacts import read_json, result_rows, validate_final_artifacts, validate_policy_directory, write_json, write_results_csv
 from .config import SUITES, ExperimentConfig, load_config
 from .paths import ProjectPaths, ensure_run_layout
-from .prepare_assets import validate_assets
+from .prepare_assets import _resource_root, validate_assets
 from .subprocess_utils import run_command
 from .train import offline_environment
 
@@ -19,14 +19,16 @@ def build_eval_command(policy: Path, output: Path, suite: str, config: Experimen
         f"--eval.n_episodes={config.episodes_per_task}", "--eval.use_async_envs=false", "--eval.recording=false",
         f"--seed={config.evaluation_seed}", f"--output_dir={output}"]
 
-def create_libero_config(run: Path, assets: Path) -> Path:
-    from importlib.metadata import distribution
-    package = Path(distribution("libero").locate_file("libero/libero")).resolve()
-    if not (package / "bddl_files").is_dir() or not (package / "init_files").is_dir():
-        raise FileNotFoundError(f"test: installed LIBERO-plus package data is incomplete under {package}")
+def create_libero_config(run: Path, source: Path, assets: Path) -> Path:
+    """Configure uv-managed LIBERO Python to use login-prepared benchmark data."""
+    resources = _resource_root(source)
+    if not (resources / "bddl_files").is_dir() or not (resources / "init_files").is_dir():
+        raise FileNotFoundError(f"test: prepared LIBERO-plus benchmark resources are incomplete under {resources}")
+    if not assets.is_dir():
+        raise FileNotFoundError(f"test: prepared LIBERO-plus assets are missing at {assets}")
     config_dir = run / "libero_config"; config_dir.mkdir(parents=True, exist_ok=True)
-    content = "\n".join((f"benchmark_root: {package}", f"assets: {assets}", f"bddl_files: {package / 'bddl_files'}",
-                         f"datasets: {package.parent / 'datasets'}", f"init_states: {package / 'init_files'}")) + "\n"
+    content = "\n".join((f"benchmark_root: {resources}", f"assets: {assets}", f"bddl_files: {resources / 'bddl_files'}",
+                         f"datasets: {resources.parent / 'datasets'}", f"init_states: {resources / 'init_files'}")) + "\n"
     (config_dir / "config.yaml").write_text(content, encoding="utf-8")
     return config_dir
 
@@ -49,7 +51,9 @@ def evaluate() -> None:
     if train_manifest.get("run_id") != paths.run_id(): raise ValueError("test: train manifest RUN_ID mismatch")
     policy = run / "model" / f"{paths.run_id()}_smolvla"; validate_policy_directory(policy)
     config = load_config(paths.project); env = offline_environment(paths); env["MUJOCO_GL"] = "egl"
-    env["LIBERO_CONFIG_PATH"] = str(create_libero_config(run, paths.project / lock["libero_assets"]["local_path"]))
+    env["LIBERO_CONFIG_PATH"] = str(create_libero_config(
+        run, paths.project / lock["libero_source"]["local_path"], paths.project / lock["libero_assets"]["local_path"]
+    ))
     started = datetime.now(timezone.utc).isoformat(); rows, videos, commands = [], {}, {}
     names = {"libero_spatial": "spatial", "libero_object": "object", "libero_goal": "goal", "libero_10": "libero10"}
     for suite in SUITES:
