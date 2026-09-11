@@ -26,9 +26,15 @@ fi
 singularity exec \
     --bind "$PROJECT:$PROJECT" \
     --pwd "$PROJECT" \
+    "$PROJECT/singularity/login.sif" \
+    uv sync --frozen
+
+singularity exec \
+    --bind "$PROJECT:$PROJECT" \
+    --pwd "$PROJECT" \
     --env "PROJECT=$PROJECT,RUN_ID=$RUN_ID,RUN_DIR=$RUN_DIR,PYTHONPATH=$PROJECT/src" \
     "$LOGIN_SIF" \
-    "$PROJECT/.venv/bin/python" -m vla_simulation_project.main prepare-assets
+    uv run --frozen python -m vla_simulation_project.main prepare-assets
 printf '{\n  "run_id": "%s",\n  "timestamp": "%s",\n  "run_dir": "%s",\n  "build_job_id": null,\n  "preprocess_job_id": null,\n  "train_job_id": null,\n  "test_job_id": null\n}\n' \
     "$RUN_ID" "$TIMESTAMP" "$RUN_DIR" > "$RUN_DIR/manifests/run.json"
 
