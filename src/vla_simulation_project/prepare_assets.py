@@ -63,10 +63,22 @@ def _extract_assets(archive: Path, target: Path) -> None:
     staging.mkdir(parents=True)
     with zipfile.ZipFile(archive) as bundle:
         root = staging.resolve()
-        for member in bundle.infolist():
+        members = bundle.infolist()
+        for member in members:
             destination = (staging / member.filename).resolve()
             if destination != root and root not in destination.parents: raise ValueError(f"unsafe path in LIBERO assets archive: {member.filename}")
-        bundle.extractall(staging)
+        with tqdm(total=sum(member.file_size for member in members), desc="Extracting LIBERO assets",
+                  unit="B", unit_scale=True, unit_divisor=1024) as progress:
+            for member in members:
+                destination = staging / member.filename
+                if member.is_dir():
+                    destination.mkdir(parents=True, exist_ok=True)
+                    continue
+                destination.parent.mkdir(parents=True, exist_ok=True)
+                with bundle.open(member) as source, destination.open("wb") as output:
+                    while chunk := source.read(1024 * 1024):
+                        output.write(chunk)
+                        progress.update(len(chunk))
     candidates = [p for p in staging.rglob("assets") if _valid_assets(p)]
     if not candidates: raise FileNotFoundError(f"downloaded archive has no valid LIBERO assets directory: {archive}")
     if target.exists(): shutil.rmtree(target)

@@ -6,7 +6,7 @@ import pytest
 from vla_simulation_project.artifacts import result_rows, validate_final_artifacts, write_json, write_parameter_csv, write_results_csv
 from vla_simulation_project.evaluate import build_eval_command
 from vla_simulation_project.paths import ProjectPaths
-from vla_simulation_project.prepare_assets import _snapshot, tqdm, validate_assets
+from vla_simulation_project.prepare_assets import _extract_assets, _snapshot, tqdm, validate_assets
 from vla_simulation_project.preprocess import choose_evenly_spaced, normalize_task_name, select_spatial_episodes
 from vla_simulation_project.train import build_train_command
 from vla_simulation_project.config import SPATIAL_TASK_NAMES
@@ -102,3 +102,15 @@ def test_snapshot_download_enables_progress_and_uses_resolved_revision(monkeypat
     assert calls["allow_patterns"] == ["*.parquet"]
     assert calls["tqdm_class"] is tqdm
     assert "Preparing Hugging Face snapshot" in capsys.readouterr().out
+
+def test_asset_extraction_shows_byte_progress(tmp_path, capsys):
+    import zipfile
+    archive = tmp_path / "assets.zip"
+    with zipfile.ZipFile(archive, "w") as bundle:
+        bundle.writestr("bundle/assets/arena.xml", "x" * 32)
+
+    target = tmp_path / "libero/assets"
+    _extract_assets(archive, target)
+
+    assert (target / "arena.xml").read_text() == "x" * 32
+    assert "Extracting LIBERO assets" in capsys.readouterr().err
