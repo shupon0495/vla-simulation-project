@@ -6,7 +6,8 @@ import pytest
 from vla_simulation_project.artifacts import result_rows, validate_final_artifacts, write_json, write_parameter_csv, write_results_csv
 from vla_simulation_project.evaluate import build_eval_command
 from vla_simulation_project.paths import ProjectPaths
-from vla_simulation_project.prepare_assets import _extract_assets, _snapshot, tqdm, validate_assets
+from vla_simulation_project.prepare_assets import (_extract_assets, _localize_tokenizer_config,
+                                                   _snapshot, tqdm, validate_assets)
 from vla_simulation_project.preprocess import choose_evenly_spaced, normalize_task_name, select_spatial_episodes
 from vla_simulation_project.train import build_train_command
 from vla_simulation_project.config import SPATIAL_TASK_NAMES
@@ -36,20 +37,34 @@ def test_asset_manifest_validation_and_missing_failure(tmp_path):
     with pytest.raises(FileNotFoundError, match="login node"): validate_assets(paths)
     base = tmp_path / "data/models/base"; dataset = tmp_path / "data/datasets/set"; vlm = tmp_path / "data/models/vlm"; assets = tmp_path / "data/assets/libero/assets"
     for directory in (base, dataset / "meta", dataset / "data", dataset / "videos", vlm, assets): directory.mkdir(parents=True)
-    for name in ("config.json", "model.safetensors", "policy_preprocessor.json", "policy_preprocessor_stats.safetensors", "policy_postprocessor.json", "policy_postprocessor_stats.safetensors"): (base / name).write_text("x")
+    for name in ("config.json", "model.safetensors", "policy_preprocessor_stats.safetensors", "policy_postprocessor.json", "policy_postprocessor_stats.safetensors"): (base / name).write_text("x")
+    (base / "policy_preprocessor.json").write_text(json.dumps({"steps": [{"config": {"tokenizer_name": "data/models/vlm"}}]}))
     (dataset / "meta/info.json").write_text("x"); (dataset / "data/a.parquet").write_text("x"); (dataset / "videos/a.mp4").write_text("x")
-    (vlm / "config.json").write_text("x"); (vlm / "model.safetensors").write_text("x"); (assets / "arena.xml").write_text("x")
+    for name in ("config.json", "model.safetensors", "tokenizer_config.json", "tokenizer.json"): (vlm / name).write_text("x")
+    (assets / "arena.xml").write_text("x")
     from vla_simulation_project.config import BASE_MODEL_REPO, BASE_MODEL_REVISION, DATASET_REPO, DATASET_REVISION, VLM_REPO
     write_json(tmp_path / "data/manifests/assets.lock.json", {"base_model": {"repo": BASE_MODEL_REPO, "revision": BASE_MODEL_REVISION, "local_path": "data/models/base"},
         "dataset": {"repo": DATASET_REPO, "revision": DATASET_REVISION, "local_path": "data/datasets/set"},
         "vlm": {"repo": VLM_REPO, "revision": "abc", "local_path": "data/models/vlm"}, "libero_assets": {"local_path": "data/assets/libero/assets"}})
     assert validate_assets(paths)["vlm"]["revision"] == "abc"
 
+def test_localize_tokenizer_config_uses_staged_vlm_path(tmp_path):
+    base = tmp_path / "base"; base.mkdir()
+    config_path = base / "policy_preprocessor.json"
+    config_path.write_text(json.dumps({"steps": [{"registry_name": "tokenizer_processor", "config": {
+        "tokenizer_name": "HuggingFaceTB/SmolVLM2-500M-Video-Instruct", "max_length": 48}}]}))
+
+    _localize_tokenizer_config(base, "data/models/smolvlm2_500m")
+
+    localized = json.loads(config_path.read_text())
+    assert localized["steps"][0]["config"]["tokenizer_name"] == "data/models/smolvlm2_500m"
+
 def test_train_and_eval_commands_are_local_and_semantic(tmp_path):
     pre = {"base_model_path": "data/models/base", "vlm_path": "data/models/vlm", "dataset_path": "data/datasets/set", "selected_episode_indices": [1, 3]}
     train = build_train_command(config(), pre, tmp_path)
     assert "--dataset.root=data/datasets/set" in train and "--dataset.episodes=[1,3]" in train
     assert "--policy.freeze_vision_encoder=true" in train and "--wandb.enable=false" in train
+    assert "--policy.vlm_model_name=data/models/vlm" in train
     evaluate = build_eval_command(Path("model"), Path("out"), "libero_goal", config())
     assert "--env.task=libero_goal" in evaluate and "--env.task_ids=[0,4,8]" in evaluate and "--eval.n_episodes=1" in evaluate
 

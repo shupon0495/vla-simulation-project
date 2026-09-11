@@ -1,5 +1,6 @@
-"""Download and validate assets on the Internet-connected login node."""
+"""Download, localize, and validate assets on the Internet-connected login node."""
 from __future__ import annotations
+import json
 import shutil, zipfile
 from pathlib import Path
 
@@ -20,10 +21,55 @@ def _valid_base(path: Path) -> bool:
     return bool(_files(path, "config.json") and _files(path, "model*.safetensors") and _files(path, "policy_preprocessor.json")
                 and _files(path, "policy_postprocessor.json") and _files(path, "policy_preprocessor*.safetensors")
                 and _files(path, "policy_postprocessor*.safetensors"))
-def _valid_vlm(path: Path) -> bool: return bool(_files(path, "config.json") and _files(path, "*.safetensors"))
+def _valid_vlm(path: Path) -> bool:
+    return bool(
+        _files(path, "config.json")
+        and _files(path, "*.safetensors")
+        and _files(path, "tokenizer_config.json")
+        and _files(path, "tokenizer.json")
+    )
 def _valid_dataset(path: Path) -> bool:
     return bool((_files(path, "info.json") or _files(path, "episodes.jsonl") or _files(path, "*.parquet")) and (_files(path, "*.parquet")) and (_files(path, "*.mp4")))
 def _valid_assets(path: Path) -> bool: return path.is_dir() and bool(_files(path, "*.xml") or _files(path, "*.bddl"))
+
+def _localize_tokenizer_config(base: Path, vlm_path: str) -> None:
+    """Point serialized tokenizer processor steps at the staged local VLM."""
+    config_path = base / "policy_preprocessor.json"
+    try:
+        config = json.loads(config_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise ValueError(f"invalid policy preprocessor config at {config_path}") from exc
+
+    tokenizer_entries: list[dict] = []
+    pending = [config]
+    while pending:
+        value = pending.pop()
+        if isinstance(value, dict):
+            if "tokenizer_name" in value:
+                tokenizer_entries.append(value)
+            pending.extend(value.values())
+        elif isinstance(value, list):
+            pending.extend(value)
+    if not tokenizer_entries:
+        raise ValueError(f"no tokenizer_name found in policy preprocessor config at {config_path}")
+    for entry in tokenizer_entries:
+        entry["tokenizer_name"] = vlm_path
+    write_json(config_path, config)
+
+def _tokenizer_config_is_local(base: Path, vlm_path: str) -> bool:
+    try:
+        config = json.loads((base / "policy_preprocessor.json").read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return False
+    values: list[str] = []
+    pending = [config]
+    while pending:
+        value = pending.pop()
+        if isinstance(value, dict):
+            if "tokenizer_name" in value: values.append(value["tokenizer_name"])
+            pending.extend(value.values())
+        elif isinstance(value, list): pending.extend(value)
+    return bool(values) and all(value == vlm_path for value in values)
 
 def validate_assets(paths: ProjectPaths) -> dict:
     lock_path = paths.data / "manifests" / LOCK_NAME
@@ -36,6 +82,13 @@ def validate_assets(paths: ProjectPaths) -> dict:
         item = lock.get(key, {}); relative = item.get("local_path"); local = paths.project / str(relative or "")
         if not relative or item.get("repo") != repo or (revision and item.get("revision") != revision) or not item.get("revision") or not validator(local):
             raise FileNotFoundError(f"missing/invalid offline {key} for {repo}@{revision or item.get('revision')} at {local}; rerun prepare-assets on the login node")
+    base_path = paths.project / lock["base_model"]["local_path"]
+    vlm_path = lock["vlm"]["local_path"]
+    if not _tokenizer_config_is_local(base_path, vlm_path):
+        raise FileNotFoundError(
+            f"offline tokenizer path is not localized to {vlm_path} in {base_path / 'policy_preprocessor.json'}; "
+            "rerun prepare-assets on the login node"
+        )
     item = lock.get("libero_assets", {}); local = paths.project / str(item.get("local_path", ""))
     if not _valid_assets(local): raise FileNotFoundError(f"missing/invalid LIBERO-plus assets at {local}; rerun prepare-assets on the login node")
     return lock
@@ -94,6 +147,7 @@ def prepare_assets() -> None:
     vlm_revision = existing.get("vlm", {}).get("revision")
     if not _valid_vlm(vlm): vlm_revision = _snapshot(VLM_REPO, "model", vlm_revision, vlm)
     if not vlm_revision: raise RuntimeError("valid VLM files exist but assets.lock.json has no resolved revision; move the managed VLM directory aside and rerun preparation")
+    _localize_tokenizer_config(base, _relative(paths, vlm))
     assets = paths.data / "assets/libero_plus/assets"
     assets_revision = existing.get("libero_assets", {}).get("revision")
     if not _valid_assets(assets):
