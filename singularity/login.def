@@ -9,7 +9,7 @@ From: ubuntu:24.04
     export DEBIAN_FRONTEND=noninteractive
 
     apt-get update
-    apt-get install -y --no-install-recommends ca-certificates python3.12-dev build-essential curl
+    apt-get install -y --no-install-recommends ca-certificates python3.12-dev build-essential curl git
     curl -LsSf https://astral.sh/uv/install.sh \
         | env UV_UNMANAGED_INSTALL=/usr/local/bin sh
     rm -rf /var/lib/apt/lists/*
