@@ -30,7 +30,11 @@ def offline_environment(paths: ProjectPaths) -> dict[str, str]:
     return env
 
 def train() -> None:
-    paths = ProjectPaths.from_environment(); run = ensure_run_layout(paths); validate_assets(paths)
+    paths = ProjectPaths.from_environment(); run = ensure_run_layout(paths)
+    # Repair stale upstream processor metadata before invoking the strictly
+    # offline trainer.  --policy.vlm_model_name does not override the
+    # tokenizer_name serialized in policy_preprocessor.json.
+    validate_assets(paths, repair_tokenizer=True)
     pre = read_json(run / "manifests/preprocess.json")
     if pre.get("run_id") != paths.run_id(): raise ValueError("train: preprocess manifest RUN_ID mismatch")
     config = load_config(paths.project); command = build_train_command(config, pre, run)

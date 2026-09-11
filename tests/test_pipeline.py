@@ -59,6 +59,32 @@ def test_localize_tokenizer_config_uses_staged_vlm_path(tmp_path):
     localized = json.loads(config_path.read_text())
     assert localized["steps"][0]["config"]["tokenizer_name"] == "data/models/smolvlm2_500m"
 
+def test_asset_validation_can_repair_remote_tokenizer_reference(tmp_path):
+    paths = ProjectPaths(tmp_path)
+    base = tmp_path / "data/models/base"; dataset = tmp_path / "data/datasets/set"
+    vlm = tmp_path / "data/models/vlm"; assets = tmp_path / "data/assets/libero/assets"
+    for directory in (base, dataset / "meta", dataset / "data", dataset / "videos", vlm, assets):
+        directory.mkdir(parents=True)
+    for name in ("config.json", "model.safetensors", "policy_preprocessor_stats.safetensors", "policy_postprocessor.json", "policy_postprocessor_stats.safetensors"):
+        (base / name).write_text("x")
+    processor = base / "policy_preprocessor.json"
+    processor.write_text(json.dumps({"steps": [{"config": {"tokenizer_name": "HuggingFaceTB/SmolVLM2-500M-Video-Instruct"}}]}))
+    (dataset / "meta/info.json").write_text("x"); (dataset / "data/a.parquet").write_text("x"); (dataset / "videos/a.mp4").write_text("x")
+    for name in ("config.json", "model.safetensors", "tokenizer_config.json", "tokenizer.json"):
+        (vlm / name).write_text("x")
+    (assets / "arena.xml").write_text("x")
+    from vla_simulation_project.config import BASE_MODEL_REPO, BASE_MODEL_REVISION, DATASET_REPO, DATASET_REVISION, VLM_REPO
+    write_json(tmp_path / "data/manifests/assets.lock.json", {
+        "base_model": {"repo": BASE_MODEL_REPO, "revision": BASE_MODEL_REVISION, "local_path": "data/models/base"},
+        "dataset": {"repo": DATASET_REPO, "revision": DATASET_REVISION, "local_path": "data/datasets/set"},
+        "vlm": {"repo": VLM_REPO, "revision": "abc", "local_path": "data/models/vlm"},
+        "libero_assets": {"local_path": "data/assets/libero/assets"},
+    })
+
+    validate_assets(paths, repair_tokenizer=True)
+
+    assert json.loads(processor.read_text())["steps"][0]["config"]["tokenizer_name"] == "data/models/vlm"
+
 def test_train_and_eval_commands_are_local_and_semantic(tmp_path):
     pre = {"base_model_path": "data/models/base", "vlm_path": "data/models/vlm", "dataset_path": "data/datasets/set", "selected_episode_indices": [1, 3]}
     train = build_train_command(config(), pre, tmp_path)
