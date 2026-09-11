@@ -183,7 +183,8 @@ Before submitting Slurm jobs, verify at minimum:
 * processor configuration/statistics exist;
 * dataset metadata exists;
 * required training dataset files exist;
-* VLM snapshot exists;
+* VLM weights, configuration, and tokenizer files exist;
+* the pretrained policy processor's `tokenizer_name` points to the staged local VLM path;
 * LIBERO assets exist;
 * the lock manifest matches expected fixed revisions.
 
