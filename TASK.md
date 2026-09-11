@@ -660,3 +660,13 @@ At completion, report:
 * test results;
 * anything not tested because it requires actual Slurm/GPU execution;
 * any remaining incompatibility found in the fixed environment.
+
+The LIBERO-plus version and Git revision must not be changed.
+
+The LIBERO-plus Python dependency must remain pinned to the revision recorded in `uv.lock`.
+
+However, benchmark resources required by LIBERO-plus at runtime, including `bddl_files`, `init_files`, and other data contained in the repository, may be fetched from the same pinned Git revision on the login node and placed in shared storage.
+
+After fetching the repository, the checked-out revision must be verified using `git rev-parse HEAD`. Compute nodes must not perform any network access.
+
+External assets must be prepared on the login node from the designated fixed source. Compute nodes must use only the local copies stored in shared storage.
