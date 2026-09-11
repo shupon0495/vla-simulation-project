@@ -86,6 +86,13 @@ def test_asset_preparation_uses_dedicated_python312_login_image():
     assert "From: ubuntu:24.04" in login_def
     assert "python3.12 -c 'import tomllib'" in login_def
 
+def test_slurm_log_paths_use_submission_timestamp():
+    submit = (Path(__file__).parents[1] / "submit_pipeline.sh").read_text()
+    for stage in ("build", "preprocess", "train", "test"):
+        assert f'{stage}-${{TIMESTAMP}}-%j.out' in submit
+        assert f'{stage}-${{TIMESTAMP}}-%j.err' in submit
+    assert "%Y-%m-%d" not in submit
+
 def test_snapshot_download_enables_progress_and_uses_resolved_revision(monkeypatch, tmp_path, capsys):
     calls = {}
     monkeypatch.setattr("vla_simulation_project.prepare_assets.HfApi.repo_info",

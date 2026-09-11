@@ -48,8 +48,8 @@ if [ ! -f "$SIF" ] || [ "$DEF" -nt "$SIF" ]; then
     BUILD_JOB=$(sbatch --parsable \
         --export="ALL,PROJECT=$PROJECT,LOG=$LOG,RUN_ID=$RUN_ID,RUN_DIR=$RUN_DIR" \
         --partition="$PPC_PARTITION" \
-        --output="$LOG/build-%j-%Y-%m-%d.out" \
-        --error="$LOG/build-%j-%Y-%m-%d.err" \
+        --output="$LOG/build-${TIMESTAMP}-%j.out" \
+        --error="$LOG/build-${TIMESTAMP}-%j.err" \
         "$PROJECT/slurm/build.sh"
     )
     BUILD_DEPENDENCY=(--dependency="afterok:$BUILD_JOB")
@@ -60,8 +60,8 @@ fi
 JOB1=$(sbatch --parsable \
     --export="ALL,PROJECT=$PROJECT,LOG=$LOG,RUN_ID=$RUN_ID,RUN_DIR=$RUN_DIR,HF_HOME=$PROJECT/data/hf_cache,HF_HUB_OFFLINE=1,HF_DATASETS_OFFLINE=1,TRANSFORMERS_OFFLINE=1" \
     --partition="$PPC_PARTITION" \
-    --output="$LOG/preprocess-%j-%Y-%m-%d.out" \
-    --error="$LOG/preprocess-%j-%Y-%m-%d.err" \
+    --output="$LOG/preprocess-${TIMESTAMP}-%j.out" \
+    --error="$LOG/preprocess-${TIMESTAMP}-%j.err" \
     "${BUILD_DEPENDENCY[@]}" \
     "$PROJECT/slurm/preprocess.sh"
 )
@@ -69,8 +69,8 @@ JOB1=$(sbatch --parsable \
 JOB2=$(sbatch --parsable \
     --export="ALL,PROJECT=$PROJECT,LOG=$LOG,RUN_ID=$RUN_ID,RUN_DIR=$RUN_DIR,HF_HOME=$PROJECT/data/hf_cache,HF_HUB_OFFLINE=1,HF_DATASETS_OFFLINE=1,TRANSFORMERS_OFFLINE=1" \
     --partition="$TRAIN_PARTITION" \
-    --output="$LOG/train-%j-%Y-%m-%d.out" \
-    --error="$LOG/train-%j-%Y-%m-%d.err" \
+    --output="$LOG/train-${TIMESTAMP}-%j.out" \
+    --error="$LOG/train-${TIMESTAMP}-%j.err" \
     --dependency="afterok:$JOB1" \
     "$PROJECT/slurm/train.sh"
 )
@@ -78,8 +78,8 @@ JOB2=$(sbatch --parsable \
 JOB3=$(sbatch --parsable \
     --export="ALL,PROJECT=$PROJECT,LOG=$LOG,RUN_ID=$RUN_ID,RUN_DIR=$RUN_DIR,HF_HOME=$PROJECT/data/hf_cache,HF_HUB_OFFLINE=1,HF_DATASETS_OFFLINE=1,TRANSFORMERS_OFFLINE=1" \
     --partition="$TEST_PARTITION" \
-    --output="$LOG/test-%j-%Y-%m-%d.out" \
-    --error="$LOG/test-%j-%Y-%m-%d.err" \
+    --output="$LOG/test-${TIMESTAMP}-%j.out" \
+    --error="$LOG/test-${TIMESTAMP}-%j.err" \
     --dependency="afterok:$JOB2" \
     "$PROJECT/slurm/test.sh"
 )
