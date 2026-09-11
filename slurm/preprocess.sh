@@ -10,5 +10,5 @@ export PROJECT=${PROJECT:-$(cd "$SCRIPT_DIR/.." && pwd)}
 source "$PROJECT/slurm/config.sh"
 
 cd "$PROJECT"
-singularity exec --bind "$PROJECT:$PROJECT" --pwd "$PROJECT" "$SIF" \
+singularity exec --nv --bind "$PROJECT:$PROJECT" --pwd "$PROJECT" "$SIF" \
     uv run --frozen --offline python -m vla_simulation_project.main preprocess
