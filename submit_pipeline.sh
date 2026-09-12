@@ -13,11 +13,6 @@ export PROJECT=${PROJECT:-$SCRIPT_DIR}
 # パスや環境変数を導入
 source "$PROJECT/slurm/config.sh"
 
-# The login image and the compute image must not share a virtual environment:
-# native packages such as torch contain architecture-specific extensions.
-LOGIN_VENV="$PROJECT/.venv-login"
-STAGING_ROOT="$PROJECT/data/assets/uv_env_staging"
-
 # ログディレクトリがないなら作成
 mkdir -p "$LOG"
 
@@ -39,47 +34,22 @@ else
     echo "Login-node asset preparation image is up to date."
 fi
 
-# Asset preparation needs its own login-image environment.  Its wheel cache is
-# persisted under PROJECT so build.sh can create the compute environment using
-# only local files after it has been allocated on the target architecture.
-mkdir -p "$UV_CACHE_DIR"
+# コンテナ実行
+# 実行のための応急処置としてuv sync --frozenを追加している
+# uv環境をloginとcomputeで共有しているのは修正したほうが良い
 singularity exec \
     --bind "$PROJECT:$PROJECT" \
     --pwd "$PROJECT" \
-    --env "UV_PROJECT_ENVIRONMENT=$LOGIN_VENV" \
-    --env "UV_CACHE_DIR=$UV_CACHE_DIR" \
     "$PROJECT/singularity/login.sif" \
     uv sync --frozen
-
-# build.sh discovers the actual architecture only after it receives a Slurm
-# allocation.  Cache the locked wheels for every architecture supported by the
-# configured compute partitions now, while the login node still has network
-# access.  The temporary environments are never used to execute Python.
-mkdir -p "$STAGING_ROOT"
-for COMPUTE_PLATFORM in x86_64-unknown-linux-gnu aarch64-unknown-linux-gnu; do
-    STAGING_VENV=$(mktemp -d "$STAGING_ROOT/$COMPUTE_PLATFORM.XXXXXX")
-    trap 'rm -rf "$STAGING_VENV"' EXIT
-    singularity exec \
-        --bind "$PROJECT:$PROJECT" \
-        --pwd "$PROJECT" \
-        --env "UV_PROJECT_ENVIRONMENT=$STAGING_VENV" \
-        --env "UV_CACHE_DIR=$UV_CACHE_DIR" \
-        --env "UV_LINK_MODE=hardlink" \
-        "$LOGIN_SIF" \
-        uv sync --frozen --no-install-project --python-platform "$COMPUTE_PLATFORM"
-    rm -rf "$STAGING_VENV"
-    trap - EXIT
-done
 
 # jobを投げる
 singularity exec \
     --bind "$PROJECT:$PROJECT" \
     --pwd "$PROJECT" \
     --env "PROJECT=$PROJECT,RUN_ID=$RUN_ID,RUN_DIR=$RUN_DIR,PYTHONPATH=$PROJECT/src" \
-    --env "UV_PROJECT_ENVIRONMENT=$LOGIN_VENV" \
-    --env "UV_CACHE_DIR=$UV_CACHE_DIR" \
     "$LOGIN_SIF" \
-    uv run --frozen --no-sync python -m vla_simulation_project.main prepare-assets
+    uv run --frozen python -m vla_simulation_project.main prepare-assets
 printf '{\n  "run_id": "%s",\n  "timestamp": "%s",\n  "run_dir": "%s",\n  "build_job_id": null,\n  "preprocess_job_id": null,\n  "train_job_id": null,\n  "test_job_id": null\n}\n' \
     "$RUN_ID" "$TIMESTAMP" "$RUN_DIR" > "$RUN_DIR/manifests/run.json"
 
