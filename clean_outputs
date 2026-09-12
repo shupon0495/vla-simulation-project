@@ -1,9 +1,9 @@
 ﻿SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 while true; do
-    read -p " path:$SCRIPT_DIR/data/outputs内のファイルを削除しますか？(y/n): " yn
+    read -p " path:{$SCRIPT_DIR}/data/outputs内のファイルを削除しますか？(y/n): " yn
     case "$yn" in
         [Yy]* ) 
-			rm -rf $SCRIPT_DIR/data/outputs/*
+			rm -rf {$SCRIPT_DIR}/data/outputs/*
             echo "削除しました"
             break
             ;;
