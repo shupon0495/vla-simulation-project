@@ -2,6 +2,7 @@
 #SBATCH --job-name=train
 #SBATCH --time=01:00:00
 #SBATCH --nodes=1
+#SBATCH --gpus=1
 
 set -euo pipefail
 
