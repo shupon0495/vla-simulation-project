@@ -31,7 +31,7 @@ Login node
         |
         +-- login.sif 内で offline asset を準備 / 確認
         |
-        +-- 必要な場合のみ build.sh
+        +-- build.sh（compute node 上で image の鮮度と CPU architecture を確認）
         |
         +-- sbatch preprocess.sh
                 |
@@ -123,7 +123,10 @@ submit_pipeline.sh
 
 Shell pipeline を再設計してはいけません。
 
-`build.sh` は、必要な場合に Singularity image を作成または更新することだけを担当します。
+`build.sh` は compute node 上で Singularity image を確認します。`ubuntu24.04.sif.arch`
+に記録した `uname -m`、definition file の更新時刻、および image の有無を照合し、
+必要な場合だけ Singularity image を作成または更新します。architecture は allocation
+された compute node でのみ確定できるため、`build.sh` 自体は各 pipeline run で投入されます。
 
 アプリケーションは container 内で以下の形式で実行します。
 
