@@ -1,44 +1,46 @@
 # TASK.md
 
-## Goal
+## 目的
 
-Convert the experiment in `final_homework_Advanced.ipynb` into the existing:
+`final_homework_Advanced.ipynb` にある実験を、既存の以下のパイプラインへ移植してください。
 
 ```text
 submit_pipeline.sh
--> optional build
--> preprocess
--> train
--> test
+  -> 必要な場合のみ build
+  -> preprocess
+  -> train
+  -> test
 ```
 
-pipeline without modifying the dependency environment.
+依存関係の環境は変更しないでください。
 
-The final pipeline must run non-interactively inside the existing Singularity + uv environment.
+最終的なパイプラインは、既存の Singularity + uv 環境内で、非対話的に実行できる必要があります。
 
-## Out of scope
+## 対象外
 
-Do NOT reproduce Notebook-only presentation or environment setup.
+Notebook 固有の表示処理や環境構築処理は再現しないでください。
 
-The following are explicitly out of scope:
+以下は明示的に対象外です。
 
-* Colab setup;
-* Google Drive;
-* apt installation;
-* pip/uv dependency modification;
-* Jupyter widgets;
-* display-only progress UI;
-* intermediate visual checks;
-* intermediate Spatial baseline-vs-finetuned evaluation;
-* notebook download buttons.
+* Colab のセットアップ
+* Google Drive
+* apt によるインストール
+* pip / uv による依存関係の変更
+* Jupyter widget
+* 表示目的だけの進捗 UI
+* 中間的な目視確認
+* 中間段階の Spatial baseline と finetuned の比較評価
+* Notebook のダウンロードボタン
 
-Do not reproduce code merely because it exists in the notebook if it does not contribute to the required final artifacts.
+Notebook に存在するという理由だけでコードを再現してはいけません。
+
+必要な最終アーティファクトの生成に寄与しない処理は移植しないでください。
 
 ---
 
-## Source revisions
+## ソースのリビジョン
 
-Use the following Notebook-defined experiment sources.
+Notebook で定義されている以下の実験用ソースを使用してください。
 
 ### Base SmolVLA model
 
@@ -56,15 +58,15 @@ revision:
 HuggingFaceTB/SmolVLM2-500M-Video-Instruct
 ```
 
-The original notebook does not pin this VLM to a commit.
+元の Notebook では、この VLM は特定の commit に固定されていません。
 
-During login-node asset preparation, resolve the concrete downloaded snapshot revision and record it in:
+ログインノード上でアセットを準備するときに、実際にダウンロードした snapshot の具体的な revision を解決し、以下へ記録してください。
 
 ```text
 data/manifests/assets.lock.json
 ```
 
-Subsequent compute jobs must reuse that exact local snapshot.
+以降の計算ジョブでは、その同じローカル snapshot を再利用してください。
 
 ### Dataset
 
@@ -76,49 +78,49 @@ revision:
 f3f49f426d75030177b18778374005bc12ccd588
 ```
 
-### Source packages
+### ソースパッケージ
 
-Use the existing project environment:
+既存のプロジェクト環境を使用してください。
 
 ```text
 LeRobot v0.6.0
 LIBERO-plus 4976dc3
 ```
 
-Do not clone or reinstall these packages at runtime.
+実行時にこれらのパッケージを clone または再インストールしてはいけません。
 
 ---
 
 ## Stage 0: submit / prepare assets
 
-Asset preparation happens on the Internet-connected login node BEFORE any Slurm compute job is submitted.
+アセット準備は、Slurm の計算ジョブを投入する前に、インターネットへ接続可能なログインノード上で行います。
 
-`submit_pipeline.sh` must:
+`submit_pipeline.sh` は以下を行う必要があります。
 
-1. create one RUN_ID;
-2. create one timestamp;
-3. determine the run output directory;
-4. check every required offline asset;
-5. download only missing assets;
-6. validate that every required asset exists locally;
-7. write/update the asset lock manifest;
-8. only after successful validation, submit Slurm jobs.
+1. 1つの `RUN_ID` を作成する
+2. 1つのタイムスタンプを作成する
+3. 実行出力ディレクトリを決定する
+4. 必要なオフラインアセットをすべて確認する
+5. 不足しているアセットだけをダウンロードする
+6. 必要なアセットがすべてローカルに存在することを検証する
+7. asset lock manifest を書き込み、または更新する
+8. 検証が成功した後にのみ Slurm ジョブを投入する
 
-If preparation fails, submit no preprocess/train/test jobs.
+準備に失敗した場合、preprocess / train / test の各ジョブを投入してはいけません。
 
-Do not modify Python dependencies during preparation.
+準備中に Python の依存関係を変更してはいけません。
 
-### Required offline assets
+### 必要なオフラインアセット
 
-At minimum determine and prepare all artifacts required by:
+最低限、以下に必要なアーティファクトをすべて特定し、準備してください。
 
-* pretrained SmolVLA policy;
-* SmolVLM2 VLM backbone;
-* `lerobot/libero_plus` dataset metadata and training data;
-* LIBERO-plus simulation assets;
-* any Hugging Face files that the train/eval commands would otherwise attempt to fetch.
+* pretrained SmolVLA policy
+* SmolVLM2 VLM backbone
+* `lerobot/libero_plus` の dataset metadata および学習データ
+* LIBERO-plus simulation assets
+* train / eval コマンドが実行時に Hugging Face から取得しようとする可能性のあるその他のファイル
 
-Use:
+必要に応じて、以下を使用してください。
 
 ```text
 data/hf_cache/
@@ -127,52 +129,52 @@ data/datasets/
 data/assets/
 ```
 
-as appropriate.
+計算ジョブは、ネットワークが利用できない状態で動作する必要があります。
 
-Compute jobs must work with networking unavailable.
-
-Set offline environment flags where appropriate so accidental Internet fallback fails immediately rather than hanging.
+計算ステージでは、必要に応じてオフライン用の環境変数を設定し、誤ってインターネットへフォールバックしようとした場合に、ハングするのではなく即座に失敗するようにしてください。
 
 ---
 
 ## RUN_ID
 
-Generate one opaque short RUN_ID for each pipeline invocation.
+パイプラインを1回実行するたびに、短く不透明な `RUN_ID` を1つ生成してください。
 
-Use one UTC or local timestamp string suitable for paths.
+パスに使用可能な UTC またはローカルタイムのタイムスタンプ文字列を1つ使用してください。
 
-Create:
+以下を作成します。
 
 ```text
 data/outputs/<timestamp>-<RUN_ID>/
 ```
 
-Export RUN_ID and output path through `sbatch --export` so every stage refers to the same run.
+`RUN_ID` と出力パスを `sbatch --export` によって渡し、すべてのステージが同じ run を参照するようにしてください。
 
-Slurm job IDs are separate from RUN_ID and must be recorded in the run manifest.
+Slurm job ID は `RUN_ID` とは別のものです。
 
-All user-facing final artifact filenames must include RUN_ID.
+Slurm job ID は run manifest に記録してください。
+
+ユーザー向けの最終アーティファクトのファイル名には、すべて `RUN_ID` を含めてください。
 
 ---
 
 ## Stage 1: preprocess
 
-Entry point:
+エントリーポイント:
 
 ```text
 uv run python -m vla_simulation_project.main preprocess
 ```
 
-Responsibilities:
+責務:
 
-1. verify compute node offline asset availability;
-2. verify expected source/data revisions;
-3. load local dataset metadata;
-4. identify LIBERO-Spatial training episodes;
-5. select training episodes deterministically;
-6. write preprocessing manifest.
+1. 計算ノード上で必要なオフラインアセットが利用可能か確認する
+2. 想定している source / data revision を確認する
+3. ローカルの dataset metadata を読み込む
+4. LIBERO-Spatial の学習用 episode を特定する
+5. 学習 episode を決定論的に選択する
+6. preprocessing manifest を書き出す
 
-Use the notebook's training selection:
+Notebook の学習データ選択条件を使用してください。
 
 ```text
 10 LIBERO-Spatial tasks
@@ -180,44 +182,44 @@ x 5 episodes per task
 = 50 training episodes
 ```
 
-Preserve the notebook's task-name normalization and deterministic/even episode selection behavior.
+Notebook の task name normalization と、決定論的かつ等間隔な episode 選択の動作を維持してください。
 
-Output:
+出力:
 
 ```text
 <run-dir>/manifests/preprocess.json
 ```
 
-The manifest must contain enough information for train to run in a new process without Notebook globals.
+この manifest には、Notebook のグローバル変数を使用せず、新しいプロセスから train を実行するために十分な情報を含めてください。
 
 ---
 
 ## Stage 2: train
 
-Entry point:
+エントリーポイント:
 
 ```text
 uv run python -m vla_simulation_project.main train
 ```
 
-Read the preprocess manifest.
+preprocess manifest を読み込んでください。
 
-Use `lerobot-train`.
+`lerobot-train` を使用してください。
 
-Default notebook hyperparameters:
+Notebook のデフォルトハイパーパラメータ:
 
 ```text
-steps               = 3000
-batch_size          = 1
-learning_rate       = 3e-4
-final_learning_rate = 3e-5
-warmup_steps        = 100
-lora_r              = 16
-lora_alpha          = 16
-log_freq            = 100
+steps                = 3000
+batch_size           = 1
+learning_rate        = 3e-4
+final_learning_rate  = 3e-5
+warmup_steps         = 100
+lora_r               = 16
+lora_alpha           = 16
+log_freq             = 100
 ```
 
-Preserve notebook behavior including:
+以下を含む Notebook の動作を維持してください。
 
 ```text
 freeze_vision_encoder = true
@@ -229,36 +231,34 @@ persistent_workers    = false
 wandb                 = disabled
 ```
 
-Experiment parameters must be configurable independently of `pyproject.toml`.
+実験パラメータは `pyproject.toml` とは独立して設定可能にしてください。
 
-Use:
+変更可能な実験設定には以下を使用してください。
 
 ```text
 config/experiment.toml
 ```
 
-for tunable experiment settings.
-
 ### Model merge
 
-After successful LoRA training:
+LoRA 学習が正常に完了した後、以下を行ってください。
 
-1. find the final checkpoint;
-2. load the SmolVLA base policy;
-3. attach LoRA adapter;
-4. merge with `merge_and_unload`;
-5. save through the appropriate LeRobot policy `save_pretrained` API;
-6. preserve required preprocessor/postprocessor statistics;
-7. verify that the resulting model can be identified as a complete policy artifact;
-8. verify no LoRA adapter weights remain in the merged weight artifact when applicable.
+1. 最終 checkpoint を見つける
+2. SmolVLA の base policy を読み込む
+3. LoRA adapter を取り付ける
+4. `merge_and_unload` でマージする
+5. 適切な LeRobot policy の `save_pretrained` API を使用して保存する
+6. 必要な preprocessor / postprocessor の統計情報を保持する
+7. 生成されたモデルが完全な policy artifact として認識できることを確認する
+8. 該当する場合、マージ済み weight artifact に LoRA adapter の weight が残っていないことを確認する
 
-The merged model is the model evaluated by `test`.
+`test` で評価するモデルは、このマージ済みモデルです。
 
-A separate intermediate baseline model is not a required final artifact.
+独立した中間 baseline model は、必須の最終アーティファクトではありません。
 
 ### Train outputs
 
-At minimum:
+最低限、以下を生成してください。
 
 ```text
 <run-dir>/model/<RUN_ID>_smolvla/
@@ -267,19 +267,19 @@ At minimum:
 <run-dir>/manifests/train.json
 ```
 
-The uncompressed model directory may be retained in addition to the archive.
+圧縮されていないモデルディレクトリは、アーカイブに加えて保持しても構いません。
 
 ---
 
 ## Parameter CSV
 
-Generate exactly one parameter CSV for the run:
+run ごとに、parameter CSV を正確に1つ生成してください。
 
 ```text
 <RUN_ID>_parameters.csv
 ```
 
-At minimum include:
+最低限、以下を含めてください。
 
 ```text
 run_id
@@ -300,23 +300,23 @@ resolved_vlm_revision
 training_episode_count
 ```
 
-Additional relevant parameters are welcome.
+その他の関連パラメータを追加しても構いません。
 
 ---
 
 ## Stage 3: test
 
-Entry point:
+エントリーポイント:
 
 ```text
 uv run python -m vla_simulation_project.main test
 ```
 
-Evaluate the merged finetuned model.
+マージ済みの finetuned model を評価してください。
 
-Do not perform the notebook's earlier intermediate Spatial comparison.
+Notebook で行われている、それ以前の中間 Spatial comparison は実行しないでください。
 
-Required final suites:
+必要な最終 suite:
 
 ```text
 libero_spatial
@@ -325,23 +325,23 @@ libero_goal
 libero_10
 ```
 
-Default task IDs from the notebook:
+Notebook のデフォルト task ID:
 
 ```text
 [0, 4, 8]
 ```
 
-for each suite.
+を各 suite で使用してください。
 
-Default episodes per task:
+task ごとのデフォルト episode 数:
 
 ```text
 1
 ```
 
-This value must be configurable so future runs can use more trials without source-code changes.
+この値は設定可能にし、将来 source code を変更することなく trial 数を増やせるようにしてください。
 
-Use the Notebook evaluation settings unless incompatible with the installed fixed LeRobot version:
+固定されている LeRobot のバージョンと互換性がない場合を除き、Notebook の以下の評価設定を使用してください。
 
 ```text
 policy.device=cuda
@@ -356,7 +356,7 @@ eval.batch_size=1
 eval.use_async_envs=false
 ```
 
-Use the Notebook camera mapping:
+Notebook の camera mapping を使用してください。
 
 ```text
 agentview_image -> front
@@ -367,15 +367,15 @@ robot0_eye_in_hand_image -> wrist
 
 ## Evaluation CSV
 
-Produce one and only one required evaluation-results CSV:
+必須の evaluation results CSV は、1つだけ生成してください。
 
 ```text
 <run-dir>/<RUN_ID>_results.csv
 ```
 
-It must contain detailed task-level data and suite-level totals.
+この CSV には、task 単位の詳細結果と suite 単位の集計結果の両方を含める必要があります。
 
-At minimum support these fields:
+最低限、以下のフィールドをサポートしてください。
 
 ```text
 run_id
@@ -387,33 +387,37 @@ n_success
 success_rate
 ```
 
-Use:
+各 task の行では、
 
 ```text
 level=task
 ```
 
-for individual task rows and:
+を使用してください。
+
+suite 集計行では、
 
 ```text
 level=suite
 ```
 
-for suite aggregate rows.
+を使用してください。
 
-For a suite row, `task_id` may be empty.
+suite 行では `task_id` は空欄でも構いません。
 
-The CSV therefore contains both detailed task results and the requested suite success rates without generating a second summary CSV.
+この構成により、詳細な task 結果と、要求される suite success rate の両方を1つの CSV に含め、2つ目の summary CSV を作らないようにしてください。
 
-Success counts must be derived from actual `eval_info.json` episode success values, not reconstructed from a rounded percentage.
+成功数は、丸められた成功率から逆算してはいけません。
 
-Keep raw LeRobot `eval_info.json` outputs under the run directory for provenance even though they are not an additional user-facing CSV.
+実際の `eval_info.json` に含まれる episode success 値から計算してください。
+
+ユーザー向けの追加 CSV にはしませんが、追跡可能性のため、LeRobot の生の `eval_info.json` 出力は run directory 内に保持してください。
 
 ---
 
 ## Rollout videos
 
-For each suite:
+以下の各 suite について、
 
 ```text
 libero_spatial
@@ -422,11 +426,11 @@ libero_goal
 libero_10
 ```
 
-record the first task, task ID 0.
+最初の task、つまり task ID 0 を録画してください。
 
-Generate exactly one requested video per suite.
+suite ごとに、要求される動画を正確に1つ生成してください。
 
-Final names:
+最終ファイル名:
 
 ```text
 <RUN_ID>_spatial.mp4
@@ -435,15 +439,15 @@ Final names:
 <RUN_ID>_libero10.mp4
 ```
 
-Do not create videos for every evaluation task.
+すべての evaluation task に対して動画を作成してはいけません。
 
-Reuse an evaluation rollout video when possible rather than running an unnecessary duplicate simulation.
+不要な重複 simulation を実行するのではなく、可能な場合は evaluation rollout の動画を再利用してください。
 
 ---
 
-## Final run layout
+## 最終 run layout
 
-Target structure:
+目標となる構造:
 
 ```text
 data/outputs/<timestamp>-<RUN_ID>/
@@ -471,13 +475,13 @@ data/outputs/<timestamp>-<RUN_ID>/
     └── test.json
 ```
 
-All final user-facing artifact filenames must contain RUN_ID.
+ユーザー向けの最終アーティファクトのファイル名には、すべて `RUN_ID` を含めてください。
 
 ---
 
 ## Shell integration
 
-Keep the existing dependency ordering:
+既存の依存順序を維持してください。
 
 ```text
 optional build
@@ -489,9 +493,9 @@ train
 test
 ```
 
-Only make minimal shell modifications.
+Shell に対する変更は最小限にしてください。
 
-Change stage entry points to:
+各 stage のエントリーポイントを以下に変更してください。
 
 ```text
 preprocess.sh:
@@ -504,44 +508,44 @@ test.sh:
 uv run python -m vla_simulation_project.main test
 ```
 
-`submit_pipeline.sh` additionally handles:
+`submit_pipeline.sh` は追加で以下を担当します。
 
-* RUN_ID/timestamp generation;
-* login-node offline-asset preparation;
-* export of run metadata;
-* existing sbatch dependency submission.
+* `RUN_ID` / timestamp の生成
+* ログインノード上での offline asset preparation
+* run metadata の export
+* 既存の sbatch dependency に基づくジョブ投入
 
-Do not change Slurm time limits as part of this task.
+このタスクの一部として Slurm の time limit を変更してはいけません。
 
 ---
 
 ## Python architecture
 
-Implement small modules rather than placing all extracted Notebook code in `main.py`.
+Notebook から抽出したコードをすべて `main.py` に入れるのではなく、小さな module に分割してください。
 
-Expected responsibilities:
+想定される責務:
 
 ```text
 main.py
-    CLI/stage dispatcher only
+    CLI / stage dispatcher のみ
 
 config.py
     experiment configuration
 
 paths.py
-    PROJECT/data/run path resolution
+    PROJECT / data / run path resolution
 
 prepare_assets.py
-    login-node local-cache validation/download
+    login node 上での local cache validation / download
 
 preprocess.py
     dataset metadata + training episode selection
 
 train.py
-    lerobot-train command/build/run
+    lerobot-train command の生成 / 実行
 
 merge.py
-    LoRA merge and model artifact validation
+    LoRA merge と model artifact validation
 
 evaluate.py
     lerobot-eval + result aggregation + video handling
@@ -550,45 +554,45 @@ artifacts.py
     manifests, CSV, archive validation
 
 subprocess_utils.py
-    subprocess execution/error handling
+    subprocess execution / error handling
 ```
 
-Do not preserve Notebook cell boundaries when a cleaner module boundary is available.
+より自然な module boundary がある場合、Notebook の cell 境界をそのまま維持する必要はありません。
 
 ---
 
 ## Tests
 
-Add GPU-independent tests for at least:
+最低限、以下について GPU を必要としないテストを追加してください。
 
-1. RUN_ID/run-directory path construction;
-2. asset manifest validation;
-3. missing asset failure;
-4. task-name normalization;
-5. deterministic episode selection;
-6. training command generation;
-7. evaluation command generation;
-8. results CSV aggregation from representative `eval_info.json`;
-9. final artifact contract validation;
-10. dependency files remain unchanged.
+1. `RUN_ID` / run directory path の構築
+2. asset manifest validation
+3. asset 不足時の failure
+4. task name normalization
+5. deterministic episode selection
+6. training command generation
+7. evaluation command generation
+8. 代表的な `eval_info.json` からの results CSV aggregation
+9. final artifact contract validation
+10. dependency files が変更されていないこと
 
-Tests must not:
+テストでは以下を行ってはいけません。
 
-* download models;
-* modify dependencies;
-* require Internet;
-* start a full training run;
-* require a GPU unless explicitly marked as an integration test.
+* model をダウンロードする
+* dependency を変更する
+* Internet を必要とする
+* 完全な training run を開始する
+* 明示的に integration test として指定されていない限り GPU を必要とする
 
 ---
 
 ## Acceptance criteria
 
-The task is complete when all of the following are true.
+以下のすべてを満たした場合、このタスクは完了です。
 
 ### Repository integrity
 
-Unchanged unless explicitly required:
+明示的に必要とされない限り、以下は変更しないでください。
 
 ```text
 final_homework_Advanced.ipynb
@@ -599,19 +603,19 @@ singularity/ubuntu24.04.def
 
 ### Offline preparation
 
-On the login node, missing required assets can be discovered and downloaded before `sbatch`.
+ログインノード上で、必要なアセットが不足している場合、それらを `sbatch` の前に検出してダウンロードできること。
 
-When all assets already exist, preparation does not redownload them.
+必要なアセットがすべて存在する場合、再ダウンロードしないこと。
 
 ### Compute isolation
 
-After submission, preprocess/train/test require no Internet connection.
+ジョブ投入後、preprocess / train / test は Internet 接続を必要としないこと。
 
-A missing required asset produces a clear failure instead of a network attempt.
+必要なアセットが不足している場合、ネットワークアクセスを試みるのではなく、原因が分かる形で失敗すること。
 
 ### Stage isolation
 
-Each of:
+以下の各 stage が、
 
 ```text
 preprocess
@@ -619,54 +623,62 @@ train
 test
 ```
 
-can start in a fresh Python process using persisted manifests from the previous stage.
+前の stage から永続化された manifest を使用し、新しい Python process から開始できること。
 
 ### Training
 
-The train stage invokes `lerobot-train`, produces the LoRA checkpoint, merges LoRA into a standalone SmolVLA model, and creates the model archive and parameter CSV.
+train stage が `lerobot-train` を呼び出し、LoRA checkpoint を生成し、LoRA を standalone SmolVLA model に merge し、model archive と parameter CSV を生成すること。
 
 ### Evaluation
 
-The test stage evaluates:
+test stage が以下を評価すること。
 
 ```text
 4 suites x 3 tasks x configured episodes
 ```
 
-and creates one detailed results CSV containing trial counts, success counts, and success rates.
+また、trial 数、成功数、成功率を含む詳細な results CSV を1つ生成すること。
 
 ### Video
 
-One task-0 video exists for each of the four suites.
+4つの suite それぞれについて、task 0 の動画が1つ存在すること。
 
 ### Traceability
 
-The same RUN_ID is present in:
+同じ `RUN_ID` が以下すべてに存在すること。
 
-* run directory;
-* final artifact names;
-* parameter CSV;
-* result CSV;
-* manifests.
+* run directory
+* final artifact filenames
+* parameter CSV
+* result CSV
+* manifests
 
-Slurm job IDs are recorded separately.
+Slurm job ID は別途記録すること。
 
 ### Validation report
 
-At completion, report:
+完了時に以下を報告してください。
 
-* files changed;
-* tests executed;
-* test results;
-* anything not tested because it requires actual Slurm/GPU execution;
-* any remaining incompatibility found in the fixed environment.
+* 変更したファイル
+* 実行したテスト
+* テスト結果
+* 実際の Slurm / GPU 実行が必要なため実行できなかった検証
+* 固定された環境内で見つかった未解決の互換性問題
 
-The LIBERO-plus version and Git revision must not be changed.
+LIBERO-plus のバージョンおよび Git revision を変更してはいけません。
 
-The LIBERO-plus Python dependency must remain pinned to the revision recorded in `uv.lock`.
+LIBERO-plus の Python dependency は、`uv.lock` に記録されている revision に固定されたままにしてください。
 
-However, benchmark resources required by LIBERO-plus at runtime, including `bddl_files`, `init_files`, and other data contained in the repository, may be fetched from the same pinned Git revision on the login node and placed in shared storage.
+ただし、実行時に LIBERO-plus が必要とする benchmark resource、具体的には `bddl_files`、`init_files`、およびリポジトリ内に含まれるその他のデータについては、ログインノード上で同じ固定済み Git revision から取得し、共有ストレージへ配置して構いません。
 
-After fetching the repository, the checked-out revision must be verified using `git rev-parse HEAD`. Compute nodes must not perform any network access.
+リポジトリを取得した後、checkout された revision を以下で検証してください。
 
-External assets must be prepared on the login node from the designated fixed source. Compute nodes must use only the local copies stored in shared storage.
+```text
+git rev-parse HEAD
+```
+
+計算ノードからネットワークアクセスを行ってはいけません。
+
+外部アセットは、指定された固定 source からログインノード上で準備してください。
+
+計算ノードでは、共有ストレージに保存されたローカルコピーのみを使用してください。

@@ -1,51 +1,57 @@
 # Offline Assets
 
-## Purpose
+## 目的
 
-Slurm compute nodes have no Internet access.
+Slurm の計算ノードはインターネットへ接続できません。
 
-This document defines every external artifact that must be available locally before compute jobs are submitted.
+このドキュメントでは、計算ジョブを投入する前にローカルで利用可能になっていなければならない、すべての外部アーティファクトを定義します。
 
-Asset preparation occurs on the Internet-connected login node.
+アセットの準備は、インターネットへ接続可能なログインノード上で行います。
 
-`submit_pipeline.sh` executes preparation in the dedicated login-node image
-`singularity/login.sif`.  It does not use the login node's system Python and it
-does not launch the compute image.
+`submit_pipeline.sh` は、専用のログインノード用イメージである
 
-Hugging Face repositories are staged with `huggingface_hub.snapshot_download`.
-Its file and byte progress indicators are kept enabled so long dataset transfers
-remain observable from the submission terminal.
+```text
+singularity/login.sif
+```
+
+の内部で準備処理を実行します。
+
+ログインノードの system Python は使用せず、compute image も起動しません。
+
+Hugging Face の repository は、`huggingface_hub.snapshot_download` を使用してローカルへ配置します。
+
+長時間の dataset 転送中でも、submission terminal から進捗を確認できるように、file および byte 単位の progress indicator は有効なままにしてください。
 
 ---
 
-## Principle
+## 基本方針
 
-The required sequence is:
+必要な処理の順序は以下です。
 
 ```text
 submit_pipeline.sh
         |
         v
-check local assets
+ローカルアセットを確認
         |
-        +-- complete --> validate
+        +-- すべて揃っている --> 検証
         |
-        +-- missing --> download missing assets
-                              |
-                              v
-                           validate
-                              |
-                              v
-                       submit Slurm jobs
+        +-- 不足している --> 不足アセットをダウンロード
+                                  |
+                                  v
+                                検証
+                                  |
+                                  v
+                          Slurm job を投入
 ```
 
-No compute job may depend on an Internet connection.
+計算ジョブは、インターネット接続に依存してはいけません。
 
 ---
 
-## Persistent locations
+## 永続化する配置先
 
-Use:
+以下を使用してください。
 
 ```text
 data/
@@ -56,11 +62,11 @@ data/
 └── manifests/
 ```
 
-Do not store persistent data below `/tmp` or notebook-style `/content`.
+永続化するデータを `/tmp` や Notebook 形式の `/content` 配下へ保存してはいけません。
 
 ---
 
-## Required external resources
+## 必要な外部リソース
 
 ### SmolVLA pretrained model
 
@@ -72,9 +78,9 @@ revision:
 7bb70aa5bc92b82c9239142775d3a173103567ff
 ```
 
-Required content includes the model and all policy processor/configuration files needed by LeRobot training.
+必要な内容には、model 本体だけでなく、LeRobot の training に必要となるすべての policy processor / configuration file を含めてください。
 
-Do not download irrelevant evaluation videos or repository documentation.
+関係のない evaluation video や repository documentation はダウンロードしないでください。
 
 ---
 
@@ -85,11 +91,11 @@ repo:
 HuggingFaceTB/SmolVLM2-500M-Video-Instruct
 ```
 
-The source notebook does not specify a commit revision.
+元の Notebook では、commit revision は指定されていません。
 
-The first successful preparation must resolve the concrete Hugging Face snapshot revision.
+最初に正常な preparation が完了したとき、実際に使用した Hugging Face snapshot の具体的な revision を解決してください。
 
-Record the resolved revision so later runs reproduce the same model.
+後の run でも同じ model を再現できるように、解決した revision を記録してください。
 
 ---
 
@@ -103,67 +109,81 @@ revision:
 f3f49f426d75030177b18778374005bc12ccd588
 ```
 
-The locally available dataset must contain everything needed for:
+ローカルに配置された dataset は、以下すべてに必要な内容を含んでいなければなりません。
 
-* metadata inspection;
-* episode selection;
-* training video/data decoding.
+* metadata の確認
+* episode の選択
+* training 用 video / data の decode
 
-A metadata-only download is insufficient if training later requires files that are not cached.
+後の training で未キャッシュのファイルが必要になる場合、metadata だけをダウンロードした状態では不十分です。
 
 ---
 
 ## LIBERO-plus assets
 
-All LIBERO-plus environment assets required for evaluation must exist locally before `test`.
+evaluation に必要なすべての LIBERO-plus environment asset は、`test` 実行前にローカルに存在していなければなりません。
 
-Evaluation must not attempt to retrieve them from the Internet.
+evaluation 中にインターネットから取得しようとしてはいけません。
 
 ---
 
 ## LIBERO-plus benchmark resources
 
-The LIBERO-plus Python package remains managed by `uv.lock`. Its benchmark
-resources are staged separately because a package wheel can omit non-Python
-directories required by evaluation.
+LIBERO-plus の Python package 自体は、`uv.lock` によって管理されたままとします。
 
-On the Internet-connected login node, `prepare-assets` clones:
+一方、benchmark resource は別途配置します。
+
+これは、package wheel に evaluation で必要となる Python 以外の directory が含まれていない可能性があるためです。
+
+インターネットへ接続可能なログインノード上で、`prepare-assets` は以下を clone します。
 
 ```text
 https://github.com/sylvestf/LIBERO-plus.git
+
 4976dc30028e805ff8094b55501d532c48fec182
 ```
 
-to `data/assets/libero_plus/source/`. It verifies `git rev-parse HEAD` is
-exactly that full commit, validates `libero/libero/bddl_files` and
-`libero/libero/init_files`, and links the source tree's legacy `assets` path to
-the separately staged external assets. Compute stages only inspect this local
-tree; they never clone, fetch, or install it.
+配置先:
+
+```text
+data/assets/libero_plus/source/
+```
+
+その後、以下を行います。
+
+* `git rev-parse HEAD` の結果が上記の完全な commit hash と完全一致することを検証する
+* `libero/libero/bddl_files` が存在することを検証する
+* `libero/libero/init_files` が存在することを検証する
+* source tree 内の従来の `assets` path を、別途配置済みの external assets へ link する
+
+Compute stage では、このローカル tree を確認するだけにしてください。
+
+Compute node 上では、clone、fetch、install を行ってはいけません。
 
 ## Source packages
 
-The following are NOT downloaded by `prepare_assets.py`:
+以下は `prepare_assets.py` ではダウンロードしません。
 
 ```text
 LeRobot v0.6.0
 LIBERO-plus Python package 4976dc3
 ```
 
-They are provided by the existing uv environment.
+これらは、既存の uv environment によって提供されます。
 
-Do not clone or reinstall them during the pipeline.
+pipeline 実行中に clone や再インストールを行ってはいけません。
 
 ---
 
 ## Asset lock file
 
-Use:
+以下を使用してください。
 
 ```text
 data/manifests/assets.lock.json
 ```
 
-Suggested format:
+推奨形式:
 
 ```json
 {
@@ -193,47 +213,47 @@ Suggested format:
 }
 ```
 
-Paths should preferably be project-relative where practical.
+可能な場合、path は project-relative にしてください。
 
 ---
 
-## Validation requirements
+## 検証要件
 
-Before submitting Slurm jobs, verify at minimum:
+Slurm job を投入する前に、最低限以下を確認してください。
 
-* required directories exist;
-* model configuration exists;
-* model weights exist;
-* processor configuration/statistics exist;
-* dataset metadata exists;
-* required training dataset files exist;
-* VLM weights, configuration, and tokenizer files exist;
-* the pretrained policy processor's `tokenizer_name` points to the staged local VLM path;
-* LIBERO assets exist;
-* LIBERO-plus benchmark source exists at its locked commit, with BDDL and init-state directories;
-* the lock manifest matches expected fixed revisions.
+* 必要な directory が存在すること
+* model configuration が存在すること
+* model weight が存在すること
+* processor configuration / statistics が存在すること
+* dataset metadata が存在すること
+* 必要な training dataset file が存在すること
+* VLM の weight、configuration、tokenizer file が存在すること
+* pretrained policy processor の `tokenizer_name` が、ローカルに配置された VLM path を指していること
+* LIBERO asset が存在すること
+* LIBERO-plus benchmark source が lock された commit で存在し、BDDL および init-state directory が存在すること
+* lock manifest が、想定されている固定 revision と一致すること
 
-Do not treat an empty directory as a valid cached artifact.
+空の directory を、有効な cached artifact とみなしてはいけません。
 
 ---
 
 ## Download policy
 
-Download only missing resources.
+不足している resource だけをダウンロードしてください。
 
-Do not repeatedly download an already valid artifact.
+すでに有効な artifact を繰り返しダウンロードしてはいけません。
 
-Do not automatically switch to a different revision when a download fails.
+ダウンロードに失敗した場合、自動的に別の revision へ切り替えてはいけません。
 
-If the fixed revision cannot be prepared, stop before submitting Slurm jobs.
+固定された revision を準備できない場合は、Slurm job を投入する前に処理を停止してください。
 
 ---
 
-## Compute-node offline configuration
+## Compute node の offline configuration
 
-Compute jobs should enable explicit offline behavior where supported.
+Compute job では、対応している場合、明示的な offline 動作を有効にしてください。
 
-Expected environment configuration includes:
+想定される environment configuration:
 
 ```text
 HF_HOME=<PROJECT>/data/hf_cache
@@ -242,13 +262,13 @@ HF_DATASETS_OFFLINE=1
 TRANSFORMERS_OFFLINE=1
 ```
 
-Any library that still tries to reach the network should fail rather than hang indefinitely.
+それでもネットワークへ接続しようとする library が存在する場合、無期限に待機するのではなく失敗するようにしてください。
 
 ---
 
-## Missing resources on compute node
+## Compute node 上で resource が不足している場合
 
-If a resource is missing during:
+以下のいずれかの stage で resource が不足している場合、
 
 ```text
 preprocess
@@ -256,13 +276,13 @@ train
 test
 ```
 
-the stage must fail with a message identifying:
+その stage は失敗し、以下を特定できる message を表示してください。
 
-* missing resource;
-* expected local path;
-* relevant repository/revision;
-* instruction that asset preparation must be run from the login node.
+* 不足している resource
+* 想定される local path
+* 関連する repository / revision
+* ログインノードから asset preparation を実行する必要があること
 
-Compute-stage code must not attempt to repair the problem by downloading the resource.
+Compute stage のコードは、resource をダウンロードして問題を修復しようとしてはいけません。
 
 ---
