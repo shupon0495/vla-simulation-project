@@ -18,7 +18,9 @@ mkdir -p "$LOG"
 
 # RUN_IDを作成して公開
 RUN_ID=$(date +%s%N | sha256sum | cut -c1-10)
-TIMESTAMP=$(date -u +%Y%m%dT%H%M%SZ)
+# Keep the run directory, manifest, and Slurm log names on Japan Standard Time.
+# Include the numeric UTC offset so the timestamp remains unambiguous.
+TIMESTAMP=$(TZ=Asia/Tokyo date +%Y%m%dT%H%M%S%z)
 RUN_DIR="$PROJECT/data/outputs/${TIMESTAMP}-${RUN_ID}"
 export RUN_ID TIMESTAMP RUN_DIR
 mkdir -p "$RUN_DIR/manifests"
