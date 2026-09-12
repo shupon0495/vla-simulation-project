@@ -186,6 +186,18 @@ def test_slurm_log_paths_use_submission_timestamp():
         assert f'{stage}-${{TIMESTAMP}}-%j.err' in submit
     assert '%Y-%m-%d' not in submit
 
+
+def test_compute_image_is_rebuilt_when_its_recorded_architecture_differs():
+    root = Path(__file__).parents[1]
+    submit = (root / 'submit_pipeline.sh').read_text()
+    build = (root / 'slurm/build.sh').read_text()
+    assert 'Checking compute Singularity image on a compute node' in submit
+    assert 'BUILD_DEPENDENCY=(--dependency="afterok:$BUILD_JOB")' in submit
+    assert 'ARCH_FILE="${SIF}.arch"' in build
+    assert 'TARGET_ARCH=$(uname -m)' in build
+    assert '[ "$(<"$ARCH_FILE")" != "$TARGET_ARCH" ]' in build
+    assert 'singularity build --fakeroot --force "$SIF" "$DEF"' in build
+
 def test_snapshot_download_enables_progress_and_uses_resolved_revision(monkeypatch, tmp_path, capsys):
     calls = {}
     monkeypatch.setattr('vla_simulation_project.prepare_assets.HfApi.repo_info', lambda *args, **kwargs: SimpleNamespace(sha='resolved-sha'))
