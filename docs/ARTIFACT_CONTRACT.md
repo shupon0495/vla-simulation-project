@@ -22,6 +22,9 @@ RUN_ID
 timestamp
 ```
 
+timestamp は JST（UTC+09:00）で生成し、UTC オフセットを含む
+`YYYYMMDDTHHMMSS+0900` 形式とします。
+
 run directory は以下です。
 
 ```text id="0f5afh"

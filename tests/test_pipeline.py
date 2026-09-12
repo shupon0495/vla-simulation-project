@@ -179,6 +179,8 @@ def test_asset_preparation_uses_dedicated_python312_login_image():
 
 def test_slurm_log_paths_use_submission_timestamp():
     submit = (Path(__file__).parents[1] / 'submit_pipeline.sh').read_text()
+    assert 'TZ=Asia/Tokyo date +%Y%m%dT%H%M%S%z' in submit
+    assert 'date -u' not in submit
     for stage in ('build', 'preprocess', 'train', 'test'):
         assert f'{stage}-${{TIMESTAMP}}-%j.out' in submit
         assert f'{stage}-${{TIMESTAMP}}-%j.err' in submit
