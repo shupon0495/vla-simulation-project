@@ -6,3 +6,4 @@ export LOG=$PROJECT/log
 export PPC_PARTITION=ng-dgx-m2
 export TRAIN_PARTITION=ng-dgx-m2
 export TEST_PARTITION=ng-dgx-m2
+export UV_LINK_MODE=copy
