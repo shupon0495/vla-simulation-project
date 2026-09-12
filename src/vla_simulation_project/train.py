@@ -83,7 +83,7 @@ def train() -> None:
     checkpoint = run / 'training/checkpoints' / f'{config.steps:06d}' / 'pretrained_model'
     from .merge import merge_checkpoint
     model = run / 'model' / f'{paths.run_id()}_smolvla'
-    merge_checkpoint(paths.project / pre['base_model_path'], checkpoint, model, VLM_REPO)
+    merge_checkpoint(paths.project / pre['base_model_path'], checkpoint, model, pre['vlm_path'])
     archive = run / f'{paths.run_id()}_model.tar.gz'
     archive_model(model, archive)
     parameters = run / f'{paths.run_id()}_parameters.csv'

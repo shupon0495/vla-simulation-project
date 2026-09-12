@@ -134,8 +134,9 @@ def test_train_and_eval_commands_are_local_and_semantic(tmp_path):
     assert '--dataset.root=data/datasets/set' in train and '--dataset.episodes=[1,3]' in train
     assert '--policy.freeze_vision_encoder=true' in train and '--wandb.enable=false' in train
     assert '--policy.vlm_model_name=data/models/vlm' in train
-    evaluate = build_eval_command(Path('model'), Path('out'), 'libero_goal', config())
+    evaluate = build_eval_command(Path('model'), Path('out'), 'libero_goal', config(), Path('data/models/vlm'))
     assert '--env.task=libero_goal' in evaluate and '--env.task_ids=[0,4,8]' in evaluate and ('--eval.n_episodes=1' in evaluate)
+    assert '--policy.vlm_model_name=data/models/vlm' in evaluate
 
 def test_results_use_actual_episode_success_values(tmp_path):
     info = {'per_task': [{'task_id': 0, 'metrics': {'successes': [True, False]}}, {'task_id': 4, 'metrics': {'successes': [True]}}]}
