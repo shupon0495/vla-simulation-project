@@ -1,22 +1,22 @@
 # Architecture
 
-## Purpose
+## 目的
 
-This document defines the runtime architecture of the SmolVLA / LeRobot experiment pipeline.
+このドキュメントは、SmolVLA / LeRobot 実験パイプラインの実行時アーキテクチャを定義します。
 
-The behavioral reference is:
+動作上の参照元は以下です。
 
 ```text
 final_homework_Advanced.ipynb
 ```
 
-The notebook itself must not be modified.
+Notebook 自体は変更してはいけません。
 
-The notebook workflow is converted into a non-interactive Python pipeline executed through the existing Slurm, Singularity, and uv infrastructure.
+Notebook のワークフローを、既存の Slurm、Singularity、uv 基盤を通して実行される、非対話型の Python パイプラインへ変換します。
 
 ---
 
-## High-level architecture
+## 全体アーキテクチャ
 
 ```text
 Login node
@@ -25,13 +25,13 @@ Login node
   |
   +-- submit_pipeline.sh
         |
-        +-- create RUN_ID and timestamp
+        +-- RUN_ID と timestamp を生成
         |
-        +-- build/reuse login.sif
+        +-- login.sif を build / 再利用
         |
-        +-- prepare/check offline assets in login.sif
+        +-- login.sif 内で offline asset を準備 / 確認
         |
-        +-- optional build.sh
+        +-- 必要な場合のみ build.sh
         |
         +-- sbatch preprocess.sh
                 |
@@ -44,18 +44,18 @@ Login node
         +-- sbatch train.sh --dependency=afterok
                 |
                 v
-             train
+              train
                 |
                 +-- lerobot-train
                 +-- LoRA merge
                 |
                 v
-            merged model
+           merged model
                 |
         +-- sbatch test.sh --dependency=afterok
                 |
                 v
-              test
+               test
                 |
                 +-- LIBERO evaluation
                 +-- result aggregation
@@ -64,36 +64,36 @@ Login node
 
 ---
 
-## Environment boundary
+## 実行環境の境界
 
-There are two execution environments.
+実行環境は2つあります。
 
 ### Login node
 
-Internet access is available.
+インターネット接続が利用可能です。
 
-Responsibilities:
+責務:
 
-* generate RUN_ID;
-* generate timestamp;
-* inspect required models/datasets/assets;
-* download missing Hugging Face artifacts;
-* validate that all compute-time resources are available locally;
-* submit Slurm jobs.
+* `RUN_ID` を生成する
+* timestamp を生成する
+* 必要な model / dataset / asset を確認する
+* 不足している Hugging Face artifact をダウンロードする
+* 計算時に必要なリソースがすべてローカルに存在することを検証する
+* Slurm job を投入する
 
-The login-node preparation phase must complete before preprocess/train/test jobs are submitted.
+ログインノード上での準備処理は、preprocess / train / test job を投入する前に完了していなければなりません。
 
-Asset preparation runs in the dedicated `singularity/login.sif`, built from
-`singularity/login.def`.  This keeps it independent of both the login node's
-system Python version and the compute image. The project uv environment supplies
-`huggingface_hub`, whose snapshot progress indicators are shown while assets are
-downloaded.
+Asset preparation は、`singularity/login.def` から作成された専用の `singularity/login.sif` 内で実行します。
+
+これにより、ログインノードの system Python のバージョン、および compute image の両方から独立させます。
+
+プロジェクトの uv 環境から `huggingface_hub` を利用し、asset のダウンロード中には snapshot の進捗表示を行います。
 
 ### Compute node
 
-Internet access is unavailable.
+インターネット接続は利用できません。
 
-The compute stages are:
+Compute stage は以下です。
 
 ```text
 preprocess
@@ -101,37 +101,37 @@ train
 test
 ```
 
-All required resources must already exist locally.
+必要なリソースは、すべて事前にローカルへ配置されている必要があります。
 
-Compute-stage code must never depend on a network fallback.
+Compute stage のコードは、ネットワークへのフォールバックに依存してはいけません。
 
-Use offline Hugging Face configuration where applicable.
+必要に応じて Hugging Face の offline 設定を使用してください。
 
 ---
 
-## Execution infrastructure
+## 実行基盤
 
-The existing pipeline is authoritative:
+既存のパイプラインを正とします。
 
 ```text
 submit_pipeline.sh
-  -> build.sh if required
+  -> 必要な場合のみ build.sh
   -> preprocess.sh
   -> train.sh
   -> test.sh
 ```
 
-The shell pipeline must not be redesigned.
+Shell pipeline を再設計してはいけません。
 
-`build.sh` is responsible only for creating/updating the Singularity image when necessary.
+`build.sh` は、必要な場合に Singularity image を作成または更新することだけを担当します。
 
-The application is executed in the container using:
+アプリケーションは container 内で以下の形式で実行します。
 
 ```text
 uv run python -m vla_simulation_project.main <stage>
 ```
 
-Supported stages:
+対応する stage:
 
 ```text
 preprocess
@@ -141,9 +141,9 @@ test
 
 ---
 
-## Python architecture
+## Python アーキテクチャ
 
-Expected modules:
+想定される module:
 
 ```text
 src/vla_simulation_project/
@@ -162,14 +162,14 @@ src/vla_simulation_project/
 
 ### main.py
 
-Responsibilities:
+責務:
 
-* CLI parsing;
-* stage dispatch.
+* CLI parsing
+* stage dispatch
 
-It must not contain experiment implementation logic.
+実験の実装ロジックを含めてはいけません。
 
-Expected usage:
+想定される使用方法:
 
 ```text
 python -m vla_simulation_project.main preprocess
@@ -179,106 +179,106 @@ python -m vla_simulation_project.main test
 
 ### config.py
 
-Responsibilities:
+責務:
 
-* load `config/experiment.toml`;
-* validate experiment parameters;
-* provide typed configuration to the stages.
+* `config/experiment.toml` の読み込み
+* 実験パラメータの検証
+* 各 stage へ型付けされた configuration を提供する
 
-Dependency versions must not be configured here.
+Dependency version をここで設定してはいけません。
 
 ### paths.py
 
-Responsibilities:
+責務:
 
-* resolve PROJECT;
-* resolve persistent data directories;
-* resolve current RUN_ID directory;
-* prevent accidental writes outside managed project directories.
+* `PROJECT` を解決する
+* persistent data directory を解決する
+* 現在の `RUN_ID` に対応する directory を解決する
+* 管理対象外の project directory への誤った書き込みを防止する
 
 ### prepare_assets.py
 
-Executed on the login node.
+ログインノード上で実行します。
 
-Responsibilities:
+責務:
 
-* inspect required offline resources;
-* download only missing resources;
-* resolve and record Hugging Face revisions;
-* validate resources before Slurm submission.
+* 必要な offline resource を確認する
+* 不足している resource のみをダウンロードする
+* Hugging Face revision を解決して記録する
+* Slurm job の投入前に resource を検証する
 
-It must not install Python packages.
+Python package をインストールしてはいけません。
 
 ### preprocess.py
 
-Responsibilities:
+責務:
 
-* validate offline assets;
-* inspect local dataset metadata;
-* select the training episodes;
-* write `preprocess.json`.
+* offline asset を検証する
+* local dataset metadata を確認する
+* training episode を選択する
+* `preprocess.json` を書き出す
 
 ### train.py
 
-Responsibilities:
+責務:
 
-* read preprocessing state;
-* construct the `lerobot-train` command;
-* execute training;
-* identify the final checkpoint;
-* invoke LoRA merge;
-* write training manifest and parameter CSV.
+* preprocessing state を読み込む
+* `lerobot-train` command を構築する
+* training を実行する
+* final checkpoint を特定する
+* LoRA merge を呼び出す
+* training manifest と parameter CSV を書き出す
 
 ### merge.py
 
-Responsibilities:
+責務:
 
-* merge LoRA adapter into SmolVLA;
-* save a standalone LeRobot policy;
-* preserve processor configuration/statistics;
-* validate final model artifacts.
+* LoRA adapter を SmolVLA に merge する
+* standalone な LeRobot policy として保存する
+* processor configuration / statistics を保持する
+* final model artifact を検証する
 
 ### evaluate.py
 
-Responsibilities:
+責務:
 
-* evaluate the final merged model;
-* aggregate successes;
-* generate final result CSV;
-* create required rollout videos.
+* 最終的な merged model を評価する
+* success を集計する
+* final result CSV を生成する
+* 必要な rollout video を生成する
 
 ### artifacts.py
 
-Responsibilities:
+責務:
 
-* JSON manifest read/write;
-* CSV generation;
-* archive creation;
-* final artifact validation.
+* JSON manifest の読み書き
+* CSV の生成
+* archive の作成
+* final artifact の検証
 
 ### subprocess_utils.py
 
-Responsibilities:
+責務:
 
-* safe subprocess execution;
-* stdout/stderr handling;
-* command failure propagation.
+* 安全な subprocess execution
+* stdout / stderr の処理
+* command failure の伝播
 
 ---
 
-## Stage isolation
+## Stage の分離
 
-Stages execute as different processes.
+各 stage は別々の process として実行されます。
 
-Python globals cannot carry state between:
+Python の global state を、以下の stage 間で引き継ぐことはできません。
 
 ```text
 preprocess -> train -> test
 ```
 
-Persistent JSON files must be used instead.
+代わりに、永続化された JSON file を使用してください。
 
-Expected files:
+想定される file:
 
 ```text
 <run-dir>/manifests/run.json
@@ -287,15 +287,15 @@ Expected files:
 <run-dir>/manifests/test.json
 ```
 
-A stage must be restartable using only:
+各 stage は、以下だけを使用して再実行可能でなければなりません。
 
-* environment variables;
-* configuration;
-* files created by previous stages.
+* environment variable
+* configuration
+* 前の stage が生成した file
 
 ---
 
-## Configuration boundary
+## 設定の境界
 
 Dependency configuration:
 
@@ -304,15 +304,15 @@ pyproject.toml
 uv.lock
 ```
 
-is immutable.
+は変更不可とします。
 
-Experiment configuration belongs in:
+Experiment configuration は以下に配置します。
 
 ```text
 config/experiment.toml
 ```
 
-Example tunable values:
+変更可能な値の例:
 
 ```text
 steps
@@ -331,7 +331,7 @@ evaluation episodes per task
 
 ## Storage layout
 
-Persistent storage is located below the repository:
+Persistent storage は repository 配下に配置します。
 
 ```text
 data/
@@ -343,33 +343,32 @@ data/
 └── outputs/
 ```
 
-Each experiment has exactly one run directory:
+各 experiment には、正確に1つの run directory を使用します。
 
 ```text
 data/outputs/<timestamp>-<RUN_ID>/
 ```
 
-The same RUN_ID is used through the whole pipeline.
+パイプライン全体を通して、同じ `RUN_ID` を使用します。
 
-Slurm job IDs are recorded separately.
+Slurm job ID は別途記録します。
 
 ---
 
 ## Failure policy
 
-Fail fast.
+問題が発生した場合は、早期に失敗してください。
 
-Do not:
+以下を行ってはいけません。
 
-* silently skip missing artifacts;
-* download resources from compute nodes;
-* continue after failed `lerobot-train`;
-* continue after failed `lerobot-eval`;
-* modify dependencies to solve runtime errors.
+* 不足している artifact を黙って無視する
+* compute node から resource をダウンロードする
+* `lerobot-train` が失敗した後も処理を続行する
+* `lerobot-eval` が失敗した後も処理を続行する
+* runtime error を解決するために dependency を変更する
 
-A failure must propagate as a non-zero process exit code.
+失敗は、0 以外の process exit code として伝播させる必要があります。
 
 ---
-
 
 ---

@@ -1,44 +1,44 @@
 # Notebook Mapping
 
-## Purpose
+## 目的
 
-This document records how `final_homework_Advanced.ipynb` is translated into the non-interactive project pipeline.
+このドキュメントは、`final_homework_Advanced.ipynb` の内容を、非対話型のプロジェクトパイプラインへどのように移植するかを記録するものです。
 
-The goal is not to execute every notebook cell.
+目的は、Notebook のすべてのセルをそのまま実行することではありません。
 
-Notebook-specific environment setup and presentation logic must be removed while preserving the required experiment semantics.
-
----
-
-## Mapping table
-
-| Notebook section | Purpose                         | Pipeline mapping                   | Action                             |
-| ---------------- | ------------------------------- | ---------------------------------- | ---------------------------------- |
-| Section 1        | Colab/runtime setup             | none                               | Do not port                        |
-| Section 2        | apt/system packages             | existing Singularity image         | Do not port                        |
-| Section 3        | LeRobot installation/patching   | existing uv environment            | Do not reinstall                   |
-| Section 4        | Hugging Face helper             | `prepare_assets.py`                | Extract only reusable asset logic  |
-| Section 5        | LIBERO-plus setup/assets        | `prepare_assets.py` / local assets | Do not reinstall package           |
-| Section 6        | experiment constants            | `config.py` / `experiment.toml`    | Port                               |
-| Section 7        | Spatial episode selection       | `preprocess.py`                    | Port                               |
-| Section 8.0      | hyperparameters                 | `config/experiment.toml`           | Port                               |
-| Section 8.1      | base model download             | `prepare_assets.py`                | Adapt for offline runtime          |
-| Section 8.2      | LoRA training                   | `train.py`                         | Port                               |
-| Section 8.3      | LoRA merge                      | `merge.py`                         | Port                               |
-| Section 8.4      | baseline preparation            | none                               | Omit unless later required         |
-| Section 8.5      | intermediate Spatial comparison | none                               | Omit                               |
-| Section 8.6      | intermediate comparison CSV     | none                               | Omit                               |
-| Section 8.7      | model archive                   | `artifacts.py`                     | Port                               |
-| Section 8.8      | rollout video                   | `evaluate.py`                      | Reimplement for final suite videos |
-| Section 9        | advanced evaluation             | `evaluate.py`                      | Port                               |
+必要な実験の意味や条件を維持しつつ、Notebook 固有の環境構築処理や表示ロジックは除去してください。
 
 ---
 
-## Explicitly excluded notebook behavior
+## 対応表
 
-Do not copy:
+| Notebook section | 目的                              | Pipeline 上の対応先                     | 対応方針                  |
+| ---------------- | ------------------------------- | ---------------------------------- | --------------------- |
+| Section 1        | Colab / runtime setup           | なし                                 | 移植しない                 |
+| Section 2        | apt / system packages           | 既存 Singularity image               | 移植しない                 |
+| Section 3        | LeRobot installation / patching | 既存 uv environment                  | 再インストールしない            |
+| Section 4        | Hugging Face helper             | `prepare_assets.py`                | 再利用可能な asset 処理だけ抽出   |
+| Section 5        | LIBERO-plus setup / assets      | `prepare_assets.py` / local assets | package は再インストールしない   |
+| Section 6        | experiment constants            | `config.py` / `experiment.toml`    | 移植する                  |
+| Section 7        | Spatial episode selection       | `preprocess.py`                    | 移植する                  |
+| Section 8.0      | hyperparameters                 | `config/experiment.toml`           | 移植する                  |
+| Section 8.1      | base model download             | `prepare_assets.py`                | offline runtime 向けに適応 |
+| Section 8.2      | LoRA training                   | `train.py`                         | 移植する                  |
+| Section 8.3      | LoRA merge                      | `merge.py`                         | 移植する                  |
+| Section 8.4      | baseline preparation            | なし                                 | 後から必要にならない限り省略        |
+| Section 8.5      | intermediate Spatial comparison | なし                                 | 省略                    |
+| Section 8.6      | intermediate comparison CSV     | なし                                 | 省略                    |
+| Section 8.7      | model archive                   | `artifacts.py`                     | 移植する                  |
+| Section 8.8      | rollout video                   | `evaluate.py`                      | 最終 suite 動画用として再実装    |
+| Section 9        | advanced evaluation             | `evaluate.py`                      | 移植する                  |
 
-```text
+---
+
+## 明示的に除外する Notebook の処理
+
+以下はコピーしないでください。
+
+```text id="04ki7p"
 google.colab
 Google Drive mount
 /content paths
@@ -52,15 +52,15 @@ notebook download UI
 interactive progress UI
 ```
 
-The target environment is not Colab.
+対象環境は Colab ではありません。
 
 ---
 
-## Fixed experiment sources
+## 固定された実験ソース
 
 ### Base SmolVLA model
 
-```text
+```text id="sv35vf"
 repo:
 lerobot/smolvla_libero_plus
 
@@ -70,7 +70,7 @@ revision:
 
 ### Dataset
 
-```text
+```text id="f77nhn"
 repo:
 lerobot/libero_plus
 
@@ -80,17 +80,17 @@ f3f49f426d75030177b18778374005bc12ccd588
 
 ### VLM
 
-```text
+```text id="wx61u8"
 HuggingFaceTB/SmolVLM2-500M-Video-Instruct
 ```
 
-The notebook does not pin the VLM commit.
+Notebook では、VLM の commit は固定されていません。
 
-Asset preparation must resolve the concrete revision used and persist it in `assets.lock.json`.
+Asset preparation の際に、実際に使用する具体的な revision を解決し、`assets.lock.json` に永続化してください。
 
 ### Python source dependencies
 
-```text
+```text id="n5exg0"
 LeRobot:
 v0.6.0
 
@@ -98,67 +98,67 @@ LIBERO-plus:
 4976dc3
 ```
 
-These are already managed through the existing uv project configuration.
+これらは、既存の uv project configuration によってすでに管理されています。
 
-Do not clone or reinstall them.
+clone や再インストールを行ってはいけません。
 
 ---
 
-## Training dataset selection
+## 学習データセットの選択
 
-Preserve the notebook behavior:
+Notebook の以下の動作を維持してください。
 
-```text
+```text id="3u4jzr"
 LIBERO-Spatial
 10 tasks
 5 episodes per task
 50 episodes total
 ```
 
-Selection must be deterministic.
+選択は決定論的でなければなりません。
 
-Task-name normalization behavior from the notebook must be preserved.
+Notebook の task-name normalization の動作も維持してください。
 
-The selected episode IDs must be persisted in:
+選択された episode ID は以下へ永続化してください。
 
-```text
+```text id="2qn5ns"
 <run-dir>/manifests/preprocess.json
 ```
 
-Train must not recompute a different selection.
+train stage で、異なる episode 選択を再計算してはいけません。
 
 ---
 
-## Default training parameters
+## デフォルト学習パラメータ
 
-Initial defaults come from the notebook:
+初期デフォルト値は Notebook の以下を使用します。
 
-```text
-steps               = 3000
-batch_size          = 1
-learning_rate       = 3e-4
-final_learning_rate = 3e-5
-warmup_steps        = 100
-lora_r              = 16
-lora_alpha          = 16
-log_freq            = 100
+```text id="y65z4k"
+steps                = 3000
+batch_size           = 1
+learning_rate        = 3e-4
+final_learning_rate  = 3e-5
+warmup_steps         = 100
+lora_r               = 16
+lora_alpha           = 16
+log_freq             = 100
 ```
 
-These are experiment defaults, not dependency versions.
+これらは実験用のデフォルト値であり、dependency version ではありません。
 
-They must be configurable through:
+以下から変更可能にしてください。
 
-```text
+```text id="b9t7mg"
 config/experiment.toml
 ```
 
 ---
 
-## Required training behavior
+## 必須の学習動作
 
-Preserve:
+以下の設定を維持してください。
 
-```text
+```text id="givt3w"
 freeze_vision_encoder = true
 train_expert_only = true
 use_imagenet_stats = false
@@ -168,60 +168,58 @@ persistent_workers = false
 wandb = disabled
 ```
 
-Use the existing:
+独自の trainer を実装するのではなく、既存の以下の CLI を使用してください。
 
-```text
+```text id="hscm3p"
 lerobot-train
 ```
-
-CLI rather than implementing a custom trainer.
 
 ---
 
 ## LoRA merge
 
-The training output is not considered final until the LoRA adapter has been merged into a standalone SmolVLA policy.
+LoRA adapter が standalone な SmolVLA policy に merge されるまでは、学習出力を最終成果物とみなしません。
 
-Use the appropriate SmolVLA / PEFT APIs.
+適切な SmolVLA / PEFT API を使用してください。
 
-The saved model must preserve all configuration and processor files required by `lerobot-eval`.
+保存された model は、`lerobot-eval` で必要となる configuration file および processor file をすべて保持している必要があります。
 
-The final model must be loadable independently from the training checkpoint.
+最終 model は、training checkpoint とは独立して読み込めなければなりません。
 
 ---
 
 ## Evaluation
 
-Only the final finetuned model is required.
+必要なのは、最終的な finetuned model の評価だけです。
 
-Do not reproduce the notebook's intermediate baseline-vs-finetuned Spatial comparison.
+Notebook で行われている中間的な baseline と finetuned の Spatial 比較は再現しないでください。
 
-Final evaluation suites:
+最終 evaluation suite:
 
-```text
+```text id="oz46o8"
 libero_spatial
 libero_object
 libero_goal
 libero_10
 ```
 
-Default selected task IDs:
+デフォルトで選択する task ID:
 
-```text
+```text id="fd6ic0"
 [0, 4, 8]
 ```
 
-Default number of episodes:
+デフォルト episode 数:
 
-```text
+```text id="2r4jtz"
 1 episode per task
 ```
 
-The episode count must remain configurable.
+episode 数は設定可能なままにしてください。
 
-Use the notebook's evaluation configuration:
+Notebook の以下の evaluation configuration を使用してください。
 
-```text
+```text id="77qj5e"
 device=cuda
 use_amp=false
 is_libero_plus=true
@@ -234,7 +232,7 @@ async environments=false
 
 Camera mapping:
 
-```text
+```text id="sp94tc"
 agentview_image -> front
 robot0_eye_in_hand_image -> wrist
 ```
@@ -243,13 +241,13 @@ robot0_eye_in_hand_image -> wrist
 
 ## Videos
 
-Produce one final video for task ID 0 of every suite:
+各 suite について、task ID 0 の最終動画を1つずつ生成してください。
 
-```text
+```text id="n3i8v7"
 libero_spatial -> <RUN_ID>_spatial.mp4
 libero_object  -> <RUN_ID>_object.mp4
 libero_goal    -> <RUN_ID>_goal.mp4
 libero_10      -> <RUN_ID>_libero10.mp4
 ```
 
-Avoid additional simulation solely for video generation if a usable rollout video from evaluation already exists.
+evaluation ですでに利用可能な rollout video が存在する場合、動画生成だけを目的として追加の simulation を実行することは避けてください。

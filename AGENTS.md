@@ -1,49 +1,49 @@
 # AGENTS.md
 
-## Project purpose
+## プロジェクトの目的
 
-This repository converts the workflow in `final_homework_Advanced.ipynb` into a reproducible, non-interactive Python/Slurm pipeline for training and evaluating SmolVLA with LeRobot and LIBERO-plus.
+このリポジトリは、`final_homework_Advanced.ipynb` にあるワークフローを、SmolVLA を LeRobot および LIBERO-plus と組み合わせて学習・評価するための、再現可能かつ非対話型の Python / Slurm パイプラインへ変換することを目的としています。
 
-The existing execution infrastructure is already prepared.
+既存の実行基盤はすでに準備されています。
 
-The expected pipeline is:
+想定されるパイプラインは次のとおりです。
 
 ```text
 submit_pipeline.sh
-  -> build.sh, only when necessary
+  -> build.sh（必要な場合のみ）
   -> preprocess.sh
   -> train.sh
   -> test.sh
 ```
 
-Preserve this architecture.
+このアーキテクチャを維持してください。
 
-## Primary source
+## 主要な参照元
 
-`final_homework_Advanced.ipynb` is the behavioral reference for the LeRobot / LIBERO-plus experiment.
+`final_homework_Advanced.ipynb` は、LeRobot / LIBERO-plus 実験の動作上の基準です。
 
-Do not modify the notebook.
+Notebook は変更しないでください。
 
-When extracting logic from the notebook:
+Notebook からロジックを抽出するときは、次の方針に従ってください。
 
-* preserve experiment semantics unless `TASK.md` explicitly changes them;
-* do not blindly copy Colab-specific setup;
-* separate environment/bootstrap code from experiment logic;
-* prefer small testable Python functions over notebook-style global state.
+* `TASK.md` に明示的な変更指示がない限り、実験の意味や条件を維持すること。
+* Colab 固有のセットアップ処理をそのままコピーしないこと。
+* 環境構築・ブートストラップ処理と、実験ロジックを分離すること。
+* Notebook のようなグローバル状態に依存する実装より、小さくテスト可能な Python 関数を優先すること。
 
-## Existing environment contract
+## 既存環境に関する契約
 
-The Python environment is managed by `uv`.
+Python 環境は `uv` で管理されています。
 
-The project already contains all required Python dependencies.
+このプロジェクトには、必要な Python 依存関係がすでにすべて含まれています。
 
-The Singularity image already contains required system packages.
+Singularity イメージには、必要なシステムパッケージがすでに含まれています。
 
-Treat the existing environment as immutable.
+既存環境は変更不可のものとして扱ってください。
 
-### Dependency modifications are prohibited
+### 依存関係の変更は禁止
 
-Unless the user explicitly requests a dependency change, DO NOT run:
+ユーザーが依存関係の変更を明示的に依頼しない限り、以下を実行してはいけません。
 
 ```text
 uv add
@@ -58,7 +58,7 @@ apt update
 conda install
 ```
 
-DO NOT modify for dependency resolution:
+依存関係の解決を目的として、以下を変更してはいけません。
 
 ```text
 pyproject.toml
@@ -66,21 +66,21 @@ uv.lock
 singularity/ubuntu24.04.def
 ```
 
-If a package is missing or incompatible, stop and report:
+パッケージが不足している、または互換性がない場合は、処理を停止し、以下を報告してください。
 
-* package/module name;
-* code requiring it;
-* expected version/API when known;
-* installed version when detectable;
-* command that failed.
+* パッケージ名またはモジュール名
+* そのパッケージを必要としているコード
+* 分かる場合は、想定されるバージョンまたは API
+* 検出可能な場合は、現在インストールされているバージョン
+* 失敗したコマンド
 
-Do not solve dependency errors by upgrading, downgrading, adding, or removing packages.
+依存関係のエラーを、パッケージのアップグレード、ダウングレード、追加、削除によって解決してはいけません。
 
-## Fixed package revisions
+## 固定されたパッケージリビジョン
 
-The existing project configuration is authoritative.
+既存のプロジェクト設定を正としてください。
 
-In particular:
+特に、以下は固定されています。
 
 ```text
 LeRobot: v0.6.0
@@ -88,21 +88,21 @@ LIBERO-plus: 4976dc3
 Python: >=3.12
 ```
 
-Do not change these revisions.
+これらのリビジョンを変更してはいけません。
 
-## Network contract
+## ネットワークに関する契約
 
-The login node has Internet access.
+ログインノードはインターネットへ接続できます。
 
-Slurm compute jobs do NOT have Internet access.
+Slurm の計算ジョブはインターネットへ接続できません。
 
-All model, dataset, and asset downloads must therefore finish BEFORE Slurm compute jobs are submitted.
+したがって、モデル、データセット、アセットのダウンロードは、Slurm の計算ジョブを投入する前にすべて完了させる必要があります。
 
-Compute-stage Python must never depend on successful Internet access.
+計算ステージの Python コードは、インターネット接続の成功に依存してはいけません。
 
-During compute stages, prefer explicit offline behavior and fail clearly when a required local artifact is missing.
+計算ステージでは、明示的なオフライン動作を優先し、必要なローカルアーティファクトが存在しない場合は、原因が分かる形で失敗してください。
 
-Do not silently attempt network fallback from:
+以下の処理から、暗黙的にネットワークへフォールバックしてはいけません。
 
 ```text
 preprocess
@@ -110,9 +110,9 @@ train
 test
 ```
 
-## Existing shell pipeline
+## 既存のシェルパイプライン
 
-Preserve:
+以下を維持してください。
 
 ```text
 submit_pipeline.sh
@@ -123,11 +123,11 @@ slurm/train.sh
 slurm/test.sh
 ```
 
-Do not redesign the Slurm dependency chain.
+Slurm の依存関係チェーンを再設計してはいけません。
 
-Minimal edits required to select the Python stage are allowed.
+Python の実行ステージを選択するために必要な最小限の変更は許可します。
 
-The intended Python stage interface is:
+想定される Python ステージのインターフェースは次のとおりです。
 
 ```text
 uv run python -m vla_simulation_project.main preprocess
@@ -135,11 +135,11 @@ uv run python -m vla_simulation_project.main train
 uv run python -m vla_simulation_project.main test
 ```
 
-Asset preparation runs on the login node before `sbatch`.
+アセット準備は、`sbatch` を実行する前にログインノード上で行います。
 
-## Writable implementation area
+## 通常変更してよい実装領域
 
-Normal implementation work should be limited primarily to:
+通常の実装作業は、主として以下の範囲に限定してください。
 
 ```text
 src/vla_simulation_project/**
@@ -148,7 +148,7 @@ config/**
 docs/**
 ```
 
-Minimal modifications are allowed to:
+以下については、必要最小限の変更を許可します。
 
 ```text
 submit_pipeline.sh
@@ -157,31 +157,31 @@ slurm/train.sh
 slurm/test.sh
 ```
 
-Do not make unrelated modifications.
+関係のない変更を行ってはいけません。
 
-## Runtime identifiers
+## 実行時識別子
 
-Each pipeline execution has one `RUN_ID`.
+パイプラインの各実行には、1つの `RUN_ID` を使用します。
 
-Create one timestamp at pipeline submission time.
+パイプライン投入時に、タイムスタンプを1つだけ生成してください。
 
-The run directory is:
+実行ディレクトリは次の形式です。
 
 ```text
 data/outputs/<timestamp>-<RUN_ID>/
 ```
 
-The same RUN_ID must be propagated to preprocess, train, and test jobs.
+同じ `RUN_ID` を preprocess、train、test の各ジョブへ引き継いでください。
 
-Do not independently generate a new RUN_ID inside each stage.
+各ステージの内部で、それぞれ新しい `RUN_ID` を生成してはいけません。
 
-Record the individual Slurm job IDs separately in the run manifest.
+各 Slurm ジョブ ID は、実行マニフェスト内に個別に記録してください。
 
-## Paths
+## パス
 
-Resolve repository paths relative to `PROJECT`.
+リポジトリ内のパスは `PROJECT` を基準に解決してください。
 
-Do not use Colab paths such as:
+以下のような Colab 固有のパスを使用してはいけません。
 
 ```text
 /content
@@ -189,9 +189,9 @@ Do not use Colab paths such as:
 /content/drive
 ```
 
-Do not require Google Drive or `google.colab`.
+Google Drive や `google.colab` を必要としてはいけません。
 
-Persistent project data belongs under:
+永続化するプロジェクトデータは、以下に配置してください。
 
 ```text
 data/models/
@@ -202,71 +202,69 @@ data/manifests/
 data/outputs/
 ```
 
-## Pipeline state
+## パイプライン状態
 
-Do not depend on Python globals surviving between stages.
+ステージ間で Python のグローバル変数が維持されることを前提にしてはいけません。
 
-Each Slurm stage executes in a separate process.
+各 Slurm ステージは別々のプロセスとして実行されます。
 
-Information that must cross a stage boundary must be persisted to a file.
+ステージをまたいで必要になる情報は、必ずファイルへ永続化してください。
 
-Use machine-readable JSON manifests for pipeline state.
+パイプライン状態には、機械可読な JSON マニフェストを使用してください。
 
-At minimum record:
+最低限、以下を記録してください。
 
-* RUN_ID;
-* timestamp;
-* stage;
-* Slurm job ID when available;
-* model/dataset revisions;
-* local artifact paths;
-* selected training episodes;
-* experiment configuration;
-* output paths.
+* `RUN_ID`
+* タイムスタンプ
+* ステージ
+* 取得可能な場合は Slurm ジョブ ID
+* モデルおよびデータセットのリビジョン
+* ローカルアーティファクトのパス
+* 選択された学習エピソード
+* 実験設定
+* 出力パス
 
-## Notebook-specific exclusions
+## Notebook 固有処理の除外
 
-Do not port these Notebook behaviors into runtime Python:
+以下の Notebook 固有の処理を、実行時 Python コードへ移植してはいけません。
 
-* Google Drive mounting;
-* Colab APIs;
-* apt installation;
-* pip installation/uninstallation;
-* editable package installation;
-* package upgrade/downgrade;
-* notebook widgets;
-* IPython-only display logic;
-* manual download UI.
+* Google Drive のマウント
+* Colab API
+* apt によるインストール
+* pip によるインストール・アンインストール
+* editable install
+* パッケージのアップグレード・ダウングレード
+* Notebook widget
+* IPython 専用の表示ロジック
+* 手動操作を必要とするダウンロード UI
 
-Replace interactive visualization with normal artifact files where required.
+必要な対話的可視化は、通常のアーティファクトファイル出力へ置き換えてください。
 
-## Training behavior
+## 学習動作
 
-Use LeRobot's existing training interface rather than implementing a replacement training framework.
+独自の学習フレームワークを実装するのではなく、LeRobot の既存学習インターフェースを使用してください。
 
-Preserve use of:
+以下の使用を維持してください。
 
 ```text
 lerobot-train
 ```
 
-through subprocess unless there is a concrete compatibility reason not to.
+具体的な互換性上の理由がない限り、subprocess 経由で使用してください。
 
-Keep command construction separate from command execution so command generation is unit-testable without a GPU.
+コマンド生成とコマンド実行は分離し、GPU がなくてもコマンド生成をユニットテストできるようにしてください。
 
-Training must produce a merged, directly loadable SmolVLA policy artifact.
+学習後には、マージ済みで直接ロード可能な SmolVLA policy アーティファクトを生成する必要があります。
 
-## Evaluation behavior
+## 評価動作
 
-Use:
+LIBERO-plus の評価には以下を使用してください。
 
 ```text
 lerobot-eval
 ```
 
-for LIBERO-plus evaluation.
-
-The required suites are:
+必要な suite は以下です。
 
 ```text
 libero_spatial
@@ -275,52 +273,52 @@ libero_goal
 libero_10
 ```
 
-Do not add intermediate evaluation runs that are not required by `TASK.md`.
+`TASK.md` で要求されていない中間評価を追加してはいけません。
 
-## Errors
+## エラー処理
 
-Shell and Python failures must propagate as non-zero exit codes.
+Shell および Python の失敗は、0 以外の終了コードとして伝播させてください。
 
-Do not catch an exception merely to continue with incomplete artifacts.
+不完全なアーティファクトのまま処理を継続する目的で、例外を単に捕捉して無視してはいけません。
 
-Error messages should identify:
+エラーメッセージには、以下を特定できる情報を含めてください。
 
-* failing stage;
-* failing command;
-* relevant path;
-* missing artifact or invalid state.
+* 失敗したステージ
+* 失敗したコマンド
+* 関係するパス
+* 不足しているアーティファクト、または不正な状態
 
-## Safety around filesystem operations
+## ファイルシステム操作に関する安全性
 
-Be conservative with destructive operations.
+破壊的操作は慎重に行ってください。
 
-Never recursively delete paths outside the current run directory or explicitly managed generated directories.
+現在の実行ディレクトリ、または明示的に管理対象とされている生成ディレクトリの外側を、再帰的に削除してはいけません。
 
-Before deleting a directory, verify that it resolves underneath an approved project data/output location.
+ディレクトリを削除する前に、そのパスを解決し、許可されたプロジェクトのデータ領域または出力領域の配下にあることを確認してください。
 
-## Validation
+## 検証
 
-Prefer tests that do not require a GPU:
+GPU を必要としないテストを優先してください。
 
-* configuration parsing;
-* path construction;
-* RUN_ID handling;
-* asset-manifest validation;
-* episode selection;
-* train command construction;
-* eval command construction;
-* CSV aggregation;
-* artifact validation.
+* 設定のパース
+* パス生成
+* `RUN_ID` の処理
+* アセットマニフェストの検証
+* エピソード選択
+* train コマンド生成
+* eval コマンド生成
+* CSV 集計
+* アーティファクト検証
 
-GPU-heavy training/evaluation should not be run merely to validate a small code edit.
+小さなコード変更の検証だけを目的として、GPU を大量に使う学習や評価を実行してはいけません。
 
-Do not run a full 3000-step training job as a routine code test.
+通常のコードテストとして、3000 step の完全な学習ジョブを実行してはいけません。
 
-## Source control checks
+## ソース管理上の確認
 
-Before finishing work, inspect the diff.
+作業を終了する前に diff を確認してください。
 
-Confirm that these files have not changed unless explicitly authorized:
+明示的な許可がない限り、以下のファイルが変更されていないことを確認してください。
 
 ```text
 pyproject.toml
@@ -329,22 +327,24 @@ singularity/ubuntu24.04.def
 final_homework_Advanced.ipynb
 ```
 
-Report:
+以下を報告してください。
 
-* files changed;
-* tests/checks run;
-* checks that could not be executed;
-* remaining assumptions.
+* 変更したファイル
+* 実行したテストまたは確認
+* 実行できなかった確認
+* 残っている前提条件や仮定
 
-## Detailed documentation
+## 詳細ドキュメント
 
-Before modifying a subsystem, read the relevant specification:
+サブシステムを変更する前に、関連する仕様書を確認してください。
 
-- `docs/ARCHITECTURE.md` — execution and module architecture
-- `docs/NOTEBOOK_MAPPING.md` — mapping from notebook sections to implementation
-- `docs/OFFLINE_ASSETS.md` — offline model/dataset/asset requirements
-- `docs/ARTIFACT_CONTRACT.md` — required output files and manifests
+* `docs/ARCHITECTURE.md` — 実行構成およびモジュール構成
+* `docs/NOTEBOOK_MAPPING.md` — Notebook の各セクションと実装の対応関係
+* `docs/OFFLINE_ASSETS.md` — オフラインで必要となるモデル、データセット、アセット
+* `docs/ARTIFACT_CONTRACT.md` — 必須の出力ファイルおよびマニフェスト
 
-`AGENTS.md` and `TASK.md` take precedence if documentation conflicts.
+ドキュメント間で内容が矛盾する場合は、`AGENTS.md` と `TASK.md` を優先してください。
 
-`prepare-assets` is a login-node asset staging step, not a compute-runtime step; its implementation must not depend on launching the compute Singularity image.
+`prepare-assets` はログインノード上で行うアセットのステージング処理であり、計算ノード実行時の処理ではありません。
+
+その実装は、計算用 Singularity イメージの起動に依存してはいけません。
