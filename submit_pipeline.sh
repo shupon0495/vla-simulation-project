@@ -53,19 +53,24 @@ singularity exec \
 printf '{\n  "run_id": "%s",\n  "timestamp": "%s",\n  "run_dir": "%s",\n  "build_job_id": null,\n  "preprocess_job_id": null,\n  "train_job_id": null,\n  "test_job_id": null\n}\n' \
     "$RUN_ID" "$TIMESTAMP" "$RUN_DIR" > "$RUN_DIR/manifests/run.json"
 
-# Compute node architecture must be determined on the allocated node, rather
-# than on the login node.  build.sh is therefore submitted for every run, but
-# only calls `singularity build` when the definition or target architecture
-# requires a new image.
-echo "Checking compute Singularity image on a compute node..."
-BUILD_JOB=$(sbatch --parsable \
-    --export="ALL,PROJECT=$PROJECT,LOG=$LOG,RUN_ID=$RUN_ID,RUN_DIR=$RUN_DIR" \
-    --partition="$PPC_PARTITION" \
-    --output="$LOG/build-${TIMESTAMP}-%j.out" \
-    --error="$LOG/build-${TIMESTAMP}-%j.err" \
-    "$PROJECT/slurm/build.sh"
-)
-BUILD_DEPENDENCY=(--dependency="afterok:$BUILD_JOB")
+# もしcompute用のイメージのビルドが必要ならpreprocessに依存として追加
+# 大体login用のイメージの所と同じ
+BUILD_JOB=""
+BUILD_DEPENDENCY=()
+if [ ! -f "$SIF" ] || [ "$DEF" -nt "$SIF" ]; then
+    echo "Building Singularity image..."
+
+    BUILD_JOB=$(sbatch --parsable \
+        --export="ALL,PROJECT=$PROJECT,LOG=$LOG,RUN_ID=$RUN_ID,RUN_DIR=$RUN_DIR" \
+        --partition="$PPC_PARTITION" \
+        --output="$LOG/build-${TIMESTAMP}-%j.out" \
+        --error="$LOG/build-${TIMESTAMP}-%j.err" \
+        "$PROJECT/slurm/build.sh"
+    )
+    BUILD_DEPENDENCY=(--dependency="afterok:$BUILD_JOB")
+else
+    echo "Singularity image is up to date."
+fi
 
 JOB1=$(sbatch --parsable \
     --export="ALL,PROJECT=$PROJECT,LOG=$LOG,RUN_ID=$RUN_ID,RUN_DIR=$RUN_DIR,HF_HOME=$PROJECT/data/hf_cache,HF_HUB_OFFLINE=1,HF_DATASETS_OFFLINE=1,TRANSFORMERS_OFFLINE=1" \
@@ -94,11 +99,13 @@ JOB3=$(sbatch --parsable \
     "$PROJECT/slurm/test.sh"
 )
 
+BUILD_JSON=null
+if [ -n "$BUILD_JOB" ]; then BUILD_JSON="\"$BUILD_JOB\""; fi
 printf '{\n  "run_id": "%s",\n  "timestamp": "%s",\n  "run_dir": "%s",\n  "build_job_id": %s,\n  "preprocess_job_id": "%s",\n  "train_job_id": "%s",\n  "test_job_id": "%s"\n}\n' \
-    "$RUN_ID" "$TIMESTAMP" "$RUN_DIR" "\"$BUILD_JOB\"" "$JOB1" "$JOB2" "$JOB3" \
+    "$RUN_ID" "$TIMESTAMP" "$RUN_DIR" "$BUILD_JSON" "$JOB1" "$JOB2" "$JOB3" \
     > "$RUN_DIR/manifests/run.json"
 
-echo "build:      $BUILD_JOB"
+echo "build:      ${BUILD_JOB:-skipped}"
 echo "preprocess: $JOB1"
 echo "train:      $JOB2"
 echo "test:       $JOB3"
