@@ -11,5 +11,9 @@ export PROJECT=${PROJECT:-$(cd "$SCRIPT_DIR/.." && pwd)}
 source "$PROJECT/slurm/config.sh"
 
 cd "$PROJECT"
-singularity exec --nv --bind "$PROJECT:$PROJECT" --pwd "$PROJECT" "$SIF" \
+singularity exec --nv \
+    --bind "$PROJECT:$PROJECT" \
+    --bind /usr/share/glvnd/egl_vendor.d:/usr/share/glvnd/egl_vendor.d:ro \
+    --env __EGL_VENDOR_LIBRARY_FILENAMES=/usr/share/glvnd/egl_vendor.d/10_nvidia.json \
+    --pwd "$PROJECT" "$SIF" \
     uv run --frozen --offline python -m vla_simulation_project.main test
