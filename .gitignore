@@ -11,3 +11,6 @@ wheels/
 
 # sample jupyter notebook files
 *.ipynb
+
+# ignore log file
+log/
