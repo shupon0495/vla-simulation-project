@@ -1,5 +1,6 @@
 from __future__ import annotations
 import csv, json, tarfile
+from datetime import datetime
 from pathlib import Path
 
 def write_json(path: Path, value: object) -> None:
@@ -15,6 +16,45 @@ def read_json(path: Path) -> dict:
     if not isinstance(value, dict):
         raise ValueError(f'manifest must contain an object: {path}')
     return value
+
+def elapsed_seconds(started_at: datetime, finished_at: datetime) -> float:
+    """Return a non-negative wall-clock duration suitable for manifests."""
+    elapsed = (finished_at - started_at).total_seconds()
+    if elapsed < 0:
+        raise ValueError(f'finish time precedes start time: {started_at.isoformat()} > {finished_at.isoformat()}')
+    return round(elapsed, 6)
+
+def finalize_run_timing(run: Path, finished_at: datetime) -> dict:
+    """Aggregate completed compute-stage timings into the central run manifest."""
+    manifest_path = run / 'manifests' / 'run.json'
+    run_manifest = read_json(manifest_path)
+    timestamp = run_manifest.get('timestamp')
+    if not isinstance(timestamp, str):
+        raise ValueError(f'run manifest has no timestamp: {manifest_path}')
+    try:
+        pipeline_started_at = datetime.fromisoformat(timestamp)
+    except ValueError as exc:
+        raise ValueError(f'run manifest timestamp is invalid: {timestamp!r} ({manifest_path})') from exc
+    stage_specs = {
+        'preprocess': ('preprocess.json', 'preprocess_elapsed_seconds'),
+        'train': ('train.json', 'training_elapsed_seconds'),
+        'test': ('test.json', 'evaluation_elapsed_seconds'),
+    }
+    stage_elapsed_seconds = {}
+    for stage, (name, field) in stage_specs.items():
+        value = read_json(run / 'manifests' / name).get(field)
+        if not isinstance(value, (int, float)) or isinstance(value, bool) or value < 0:
+            raise ValueError(f'{stage} manifest has invalid {field}: {value!r}')
+        stage_elapsed_seconds[stage] = value
+    run_manifest.update({
+        'pipeline_started_at': timestamp,
+        'pipeline_finished_at': finished_at.isoformat(),
+        'stage_elapsed_seconds': stage_elapsed_seconds,
+        'compute_elapsed_seconds': round(sum(stage_elapsed_seconds.values()), 6),
+        'total_elapsed_seconds': elapsed_seconds(pipeline_started_at, finished_at),
+    })
+    write_json(manifest_path, run_manifest)
+    return run_manifest
 
 def validate_policy_directory(path: Path) -> None:
     required = ('model.safetensors', 'config.json', 'policy_preprocessor.json', 'policy_postprocessor.json')

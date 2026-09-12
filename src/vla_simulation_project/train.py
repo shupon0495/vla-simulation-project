@@ -3,7 +3,7 @@ import json, os
 from dataclasses import asdict
 from datetime import datetime, timezone
 from pathlib import Path
-from .artifacts import archive_model, read_json, write_json, write_parameter_csv
+from .artifacts import archive_model, elapsed_seconds, read_json, write_json, write_parameter_csv
 from .config import BASE_MODEL_REPO, BASE_MODEL_REVISION, DATASET_REPO, DATASET_REVISION, VLM_REPO, ExperimentConfig, load_config
 from .paths import ProjectPaths, ensure_run_layout
 from .prepare_assets import validate_assets
@@ -69,6 +69,7 @@ def offline_environment(paths: ProjectPaths) -> dict[str, str]:
 def train() -> None:
     paths = ProjectPaths.from_environment()
     run = ensure_run_layout(paths)
+    started = datetime.now(timezone.utc)
     # Repair stale upstream processor metadata before invoking the strictly
     # offline trainer. --policy.vlm_model_name does not override the
     # tokenizer_name serialized in policy_preprocessor.json.
@@ -78,7 +79,6 @@ def train() -> None:
         raise ValueError('train: preprocess manifest RUN_ID mismatch')
     config = load_config(paths.project)
     command = build_train_command(config, pre, run)
-    started = datetime.now(timezone.utc).isoformat()
     run_command('train', command, cwd=paths.project, env=offline_environment(paths))
     checkpoint = run / 'training/checkpoints' / f'{config.steps:06d}' / 'pretrained_model'
     from .merge import merge_checkpoint
@@ -89,4 +89,5 @@ def train() -> None:
     parameters = run / f'{paths.run_id()}_parameters.csv'
     values = {**asdict(config), 'dataset_repo': DATASET_REPO, 'dataset_revision': DATASET_REVISION, 'base_model_repo': BASE_MODEL_REPO, 'base_model_revision': BASE_MODEL_REVISION, 'vlm_repo': VLM_REPO, 'resolved_vlm_revision': pre['resolved_vlm_revision'], 'training_episode_count': pre['selected_episode_count']}
     write_parameter_csv(parameters, paths.run_id(), values)
-    write_json(run / 'manifests/train.json', {'run_id': paths.run_id(), 'stage': 'train', 'slurm_job_id': os.environ.get('SLURM_JOB_ID'), 'training_started_at': started, 'training_finished_at': datetime.now(timezone.utc).isoformat(), 'training_exit_code': 0, 'checkpoint_path': str(checkpoint), 'merged_model_path': str(model), 'model_archive_path': str(archive), 'parameters_csv_path': str(parameters), 'command': command, 'experiment_config': values})
+    finished = datetime.now(timezone.utc)
+    write_json(run / 'manifests/train.json', {'run_id': paths.run_id(), 'stage': 'train', 'slurm_job_id': os.environ.get('SLURM_JOB_ID'), 'training_started_at': started.isoformat(), 'training_finished_at': finished.isoformat(), 'training_elapsed_seconds': elapsed_seconds(started, finished), 'training_exit_code': 0, 'checkpoint_path': str(checkpoint), 'merged_model_path': str(model), 'model_archive_path': str(archive), 'parameters_csv_path': str(parameters), 'command': command, 'experiment_config': values})

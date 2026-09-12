@@ -2,7 +2,7 @@ from __future__ import annotations
 import json, os, shutil
 from datetime import datetime, timezone
 from pathlib import Path
-from .artifacts import read_json, result_rows, validate_final_artifacts, validate_policy_directory, write_json, write_results_csv
+from .artifacts import elapsed_seconds, finalize_run_timing, read_json, result_rows, validate_final_artifacts, validate_policy_directory, write_json, write_results_csv
 from .config import SUITES, ExperimentConfig, load_config
 from .paths import ProjectPaths, ensure_run_layout
 from .prepare_assets import _resource_root, validate_assets
@@ -56,6 +56,7 @@ def _task_video(info: dict, task_id: int, output: Path) -> Path:
 def evaluate() -> None:
     paths = ProjectPaths.from_environment()
     run = ensure_run_layout(paths)
+    started = datetime.now(timezone.utc)
     lock = validate_assets(paths)
     train_manifest = read_json(run / 'manifests/train.json')
     if train_manifest.get('run_id') != paths.run_id():
@@ -69,7 +70,6 @@ def evaluate() -> None:
     vlm_path = paths.project / lock['vlm']['local_path']
     env['LIBERO_CONFIG_PATH'] = str(create_libero_config(run, libero_source, paths.project / lock['libero_assets']['local_path']))
     add_libero_source_to_pythonpath(env, libero_source)
-    started = datetime.now(timezone.utc).isoformat()
     rows, videos, commands = ([], {}, {})
     names = {'libero_spatial': 'spatial', 'libero_object': 'object', 'libero_goal': 'goal', 'libero_10': 'libero10'}
     for suite in SUITES:
@@ -84,5 +84,8 @@ def evaluate() -> None:
         videos[suite] = str(target)
     results = run / f'{paths.run_id()}_results.csv'
     write_results_csv(results, rows)
-    write_json(run / 'manifests/test.json', {'run_id': paths.run_id(), 'stage': 'test', 'slurm_job_id': os.environ.get('SLURM_JOB_ID'), 'evaluation_started_at': started, 'evaluation_finished_at': datetime.now(timezone.utc).isoformat(), 'suites': list(SUITES), 'task_ids': list(config.task_ids), 'episodes_per_task': config.episodes_per_task, 'results_csv_path': str(results), 'video_paths': videos, 'commands': commands})
+    finished = datetime.now(timezone.utc)
+    write_json(run / 'manifests/test.json', {'run_id': paths.run_id(), 'stage': 'test', 'slurm_job_id': os.environ.get('SLURM_JOB_ID'), 'evaluation_started_at': started.isoformat(), 'evaluation_finished_at': finished.isoformat(), 'evaluation_elapsed_seconds': elapsed_seconds(started, finished), 'suites': list(SUITES), 'task_ids': list(config.task_ids), 'episodes_per_task': config.episodes_per_task, 'results_csv_path': str(results), 'video_paths': videos, 'commands': commands})
     validate_final_artifacts(run, paths.run_id(), SUITES)
+    summary = finalize_run_timing(run, datetime.now(timezone.utc))
+    print(f"Total pipeline elapsed time: {summary['total_elapsed_seconds']:.3f} seconds")

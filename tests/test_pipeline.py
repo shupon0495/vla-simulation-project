@@ -1,9 +1,10 @@
 from __future__ import annotations
 import json, os
+from datetime import datetime, timezone
 from pathlib import Path
 from types import SimpleNamespace
 import pytest
-from vla_simulation_project.artifacts import result_rows, validate_final_artifacts, write_json, write_parameter_csv, write_results_csv
+from vla_simulation_project.artifacts import finalize_run_timing, result_rows, validate_final_artifacts, write_json, write_parameter_csv, write_results_csv
 from vla_simulation_project.evaluate import add_libero_source_to_pythonpath, build_eval_command, create_libero_config
 from vla_simulation_project.paths import ProjectPaths
 from vla_simulation_project.prepare_assets import _extract_assets, _localize_tokenizer_config, _link_libero_assets, _snapshot, tqdm, validate_assets
@@ -161,6 +162,18 @@ def test_final_artifact_contract(tmp_path):
         rows += result_rows(run_id, suite, {'per_task': [{'task_id': 0, 'metrics': {'successes': [True]}}]})
     write_results_csv(run / 'r1_results.csv', rows)
     validate_final_artifacts(run, run_id, ('libero_spatial', 'libero_object', 'libero_goal', 'libero_10'))
+
+def test_run_timing_aggregates_stage_manifests(tmp_path):
+    manifests = tmp_path / 'manifests'
+    write_json(manifests / 'run.json', {'run_id': 'r1', 'timestamp': '20260913T120000+0900'})
+    write_json(manifests / 'preprocess.json', {'preprocess_elapsed_seconds': 1.25})
+    write_json(manifests / 'train.json', {'training_elapsed_seconds': 2.5})
+    write_json(manifests / 'test.json', {'evaluation_elapsed_seconds': 3.75})
+    summary = finalize_run_timing(tmp_path, datetime(2026, 9, 13, 3, 0, 10, tzinfo=timezone.utc))
+    assert summary['stage_elapsed_seconds'] == {'preprocess': 1.25, 'train': 2.5, 'test': 3.75}
+    assert summary['compute_elapsed_seconds'] == 7.5
+    assert summary['total_elapsed_seconds'] == 10.0
+    assert summary['pipeline_started_at'] == '20260913T120000+0900'
 
 def test_dependency_files_present_and_not_part_of_worktree_diff():
     root = Path(__file__).parents[1]
