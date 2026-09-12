@@ -1,27 +1,38 @@
+# submit_pipeline.sh
+# loginノードでのHFダウンロードと計算ノードへのjob作成までを行う
 #!/bin/bash
+# エラーの時に止める
+# 未定義の変数を触ったらエラーにする
+# パイプラインの途中でエラーになったら止める
 set -euo pipefail
 
+# このソースファイルの場所に移動してからpwdしたものを受け取ることでこのソースファイルの絶対パスを手に入れる
 SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+# もしPROJECTが何も入っていないならSCRIPT_DIRをPROJECTに入れる
 export PROJECT=${PROJECT:-$SCRIPT_DIR}
+# パスや環境変数を導入
 source "$PROJECT/slurm/config.sh"
 
+# ログディレクトリがないなら作成
 mkdir -p "$LOG"
 
+# RUN_IDを作成して公開
 RUN_ID=$(date +%s%N | sha256sum | cut -c1-10)
 TIMESTAMP=$(date -u +%Y%m%dT%H%M%SZ)
 RUN_DIR="$PROJECT/data/outputs/${TIMESTAMP}-${RUN_ID}"
 export RUN_ID TIMESTAMP RUN_DIR
 mkdir -p "$RUN_DIR/manifests"
 
-# The login node's system Python may be 3.9, while the project requires 3.12.
-# Build and run a small, login-only image before submitting any Slurm job.  This
-# image is intentionally separate from the compute image managed by build.sh.
+# ログインノードの環境によらずに環境構築をするためにコンテナ内でprepare-assetsを実行するようにする
+# もしSIFファイルが古い・存在しないならDEFファイルから作成する. もう既に存在するならスキップ
 if [ ! -f "$LOGIN_SIF" ] || [ "$LOGIN_DEF" -nt "$LOGIN_SIF" ]; then
     echo "Building login-node asset preparation image..."
     singularity build --fakeroot --force "$LOGIN_SIF" "$LOGIN_DEF"
 else
     echo "Login-node asset preparation image is up to date."
 fi
+
+# コンテナ実行
 
 singularity exec \
     --bind "$PROJECT:$PROJECT" \
@@ -38,8 +49,7 @@ singularity exec \
 printf '{\n  "run_id": "%s",\n  "timestamp": "%s",\n  "run_dir": "%s",\n  "build_job_id": null,\n  "preprocess_job_id": null,\n  "train_job_id": null,\n  "test_job_id": null\n}\n' \
     "$RUN_ID" "$TIMESTAMP" "$RUN_DIR" > "$RUN_DIR/manifests/run.json"
 
-# sifがないかdefのほうがsifより新しいときにdefを作成する
-# もしloginノード内でbuildをするのが禁止されていたらjobに変更するようにする
+
 BUILD_JOB=""
 BUILD_DEPENDENCY=()
 if [ ! -f "$SIF" ] || [ "$DEF" -nt "$SIF" ]; then
