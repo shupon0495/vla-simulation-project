@@ -33,13 +33,15 @@ else
 fi
 
 # コンテナ実行
-
+# 実行のための応急処置としてuv sync --frozenを追加している
+# uv環境をloginとcomputeで共有しているのは修正したほうが良い
 singularity exec \
     --bind "$PROJECT:$PROJECT" \
     --pwd "$PROJECT" \
     "$PROJECT/singularity/login.sif" \
     uv sync --frozen
 
+# jobを投げる
 singularity exec \
     --bind "$PROJECT:$PROJECT" \
     --pwd "$PROJECT" \
@@ -49,7 +51,8 @@ singularity exec \
 printf '{\n  "run_id": "%s",\n  "timestamp": "%s",\n  "run_dir": "%s",\n  "build_job_id": null,\n  "preprocess_job_id": null,\n  "train_job_id": null,\n  "test_job_id": null\n}\n' \
     "$RUN_ID" "$TIMESTAMP" "$RUN_DIR" > "$RUN_DIR/manifests/run.json"
 
-
+# もしcompute用のイメージのビルドが必要ならpreprocessに依存として追加
+# 大体login用のイメージの所と同じ
 BUILD_JOB=""
 BUILD_DEPENDENCY=()
 if [ ! -f "$SIF" ] || [ "$DEF" -nt "$SIF" ]; then
