@@ -128,12 +128,6 @@ Shell pipeline を再設計してはいけません。
 必要な場合だけ Singularity image を作成または更新します。architecture は allocation
 された compute node でのみ確定できるため、`build.sh` 自体は各 pipeline run で投入されます。
 
-同じ build job は、`<PROJECT>/.venv-compute-<architecture>` を compute SIF 内で
-offline に同期し、`torch._C` を import して native extension が完全であることを確認します。
-login image の `.venv-login` と compute environment は共有しません。preprocess、train、test
-は `uv run --frozen --offline --no-sync` で実行するため、compute stage が package を
-install、uninstall、download することはありません。
-
 アプリケーションは container 内で以下の形式で実行します。
 
 ```text
