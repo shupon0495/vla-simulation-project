@@ -285,4 +285,14 @@ test
 
 Compute stage のコードは、resource をダウンロードして問題を修復しようとしてはいけません。
 
+## Python environment
+
+ログイン用の `.venv-login` と compute 用の `.venv-compute-<architecture>` は別に保持します。
+login stage は、lock 済み wheel を `data/assets/uv_cache/` に取得します。compute architecture は
+allocation 時まで不明なため、x86_64 と aarch64 の Linux wheel を login node で事前に cache
+します。compute build stage はその cache だけを用いて compute SIF 内で環境を同期し、`torch._C`
+の import を検証します。cache に必要な wheel がない場合は、後続 stage を投入せず、login node
+で不足 wheel を準備するよう明示的に失敗します。preprocess、train、test は
+`--offline --no-sync` で環境を変更しません。
+
 ---

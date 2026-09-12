@@ -172,7 +172,9 @@ def test_asset_preparation_uses_dedicated_python312_login_image():
     submit = (root / 'submit_pipeline.sh').read_text()
     login_def = (root / 'singularity/login.def').read_text()
     assert '"$LOGIN_SIF"' in submit
-    assert 'uv run --frozen python -m vla_simulation_project.main prepare-assets' in submit
+    assert 'LOGIN_VENV="$PROJECT/.venv-login"' in submit
+    assert 'uv run --frozen --no-sync python -m vla_simulation_project.main prepare-assets' in submit
+    assert '--python-platform "$COMPUTE_PLATFORM"' in submit
     assert 'python3 -m vla_simulation_project.main prepare-assets' not in submit
     assert 'From: ubuntu:24.04' in login_def
     assert "python3.12 -c 'import tomllib'" in login_def
@@ -197,6 +199,18 @@ def test_compute_image_is_rebuilt_when_its_recorded_architecture_differs():
     assert 'TARGET_ARCH=$(uname -m)' in build
     assert '[ "$(<"$ARCH_FILE")" != "$TARGET_ARCH" ]' in build
     assert 'singularity build --fakeroot --force "$SIF" "$DEF"' in build
+    assert 'COMPUTE_VENV="$PROJECT/.venv-compute-$TARGET_ARCH"' in build
+    assert 'uv sync --frozen --offline' in build
+    assert 'torch._C.__file__' in build
+
+
+def test_compute_stages_use_arch_specific_environment_without_syncing():
+    root = Path(__file__).parents[1]
+    for stage in ('preprocess', 'train', 'test'):
+        script = (root / f'slurm/{stage}.sh').read_text()
+        assert 'COMPUTE_VENV="$PROJECT/.venv-compute-$TARGET_ARCH"' in script
+        assert 'UV_PROJECT_ENVIRONMENT=$COMPUTE_VENV' in script
+        assert 'uv run --frozen --offline --no-sync' in script
 
 def test_snapshot_download_enables_progress_and_uses_resolved_revision(monkeypatch, tmp_path, capsys):
     calls = {}
