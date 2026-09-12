@@ -10,6 +10,18 @@ from .subprocess_utils import run_command
 from .train import offline_environment
 CAMERAS = {'agentview_image': 'front', 'robot0_eye_in_hand_image': 'wrist'}
 
+
+def add_libero_source_to_pythonpath(env: dict[str, str], source: Path) -> None:
+    """Expose the prepared LIBERO-plus namespace package to lerobot-eval.
+
+    The locked LIBERO-plus revision does not package its outer ``libero``
+    namespace into a wheel.  Its validated login-node checkout is therefore
+    the offline import source used by the evaluation subprocess.
+    """
+    existing = env.get('PYTHONPATH')
+    env['PYTHONPATH'] = str(source) if not existing else f'{source}{os.pathsep}{existing}'
+
+
 def build_eval_command(policy: Path, output: Path, suite: str, config: ExperimentConfig) -> list[str]:
     return ['lerobot-eval', f'--policy.path={policy}', '--policy.device=cuda', '--policy.use_amp=false', '--env.type=libero', '--env.is_libero_plus=true', f'--env.task={suite}', '--env.task_ids=' + json.dumps(list(config.task_ids), separators=(',', ':')), '--env.camera_name_mapping=' + json.dumps(CAMERAS, separators=(',', ':')), '--env.observation_height=256', '--env.observation_width=256', '--env.control_mode=relative', '--env.max_parallel_tasks=1', '--eval.batch_size=1', f'--eval.n_episodes={config.episodes_per_task}', '--eval.use_async_envs=false', '--eval.recording=false', f'--seed={config.evaluation_seed}', f'--output_dir={output}']
 
@@ -53,7 +65,9 @@ def evaluate() -> None:
     config = load_config(paths.project)
     env = offline_environment(paths)
     env['MUJOCO_GL'] = 'egl'
-    env['LIBERO_CONFIG_PATH'] = str(create_libero_config(run, paths.project / lock['libero_source']['local_path'], paths.project / lock['libero_assets']['local_path']))
+    libero_source = paths.project / lock['libero_source']['local_path']
+    env['LIBERO_CONFIG_PATH'] = str(create_libero_config(run, libero_source, paths.project / lock['libero_assets']['local_path']))
+    add_libero_source_to_pythonpath(env, libero_source)
     started = datetime.now(timezone.utc).isoformat()
     rows, videos, commands = ([], {}, {})
     names = {'libero_spatial': 'spatial', 'libero_object': 'object', 'libero_goal': 'goal', 'libero_10': 'libero10'}

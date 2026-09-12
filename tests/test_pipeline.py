@@ -4,7 +4,7 @@ from pathlib import Path
 from types import SimpleNamespace
 import pytest
 from vla_simulation_project.artifacts import result_rows, validate_final_artifacts, write_json, write_parameter_csv, write_results_csv
-from vla_simulation_project.evaluate import build_eval_command, create_libero_config
+from vla_simulation_project.evaluate import add_libero_source_to_pythonpath, build_eval_command, create_libero_config
 from vla_simulation_project.paths import ProjectPaths
 from vla_simulation_project.prepare_assets import _extract_assets, _localize_tokenizer_config, _link_libero_assets, _snapshot, tqdm, validate_assets
 from vla_simulation_project.preprocess import choose_evenly_spaced, normalize_task_name, select_spatial_episodes
@@ -108,6 +108,14 @@ def test_libero_config_uses_prepared_source_resources(tmp_path):
     assert f'bddl_files: {source / 'libero/libero/bddl_files'}' in text
     assert f'init_states: {source / 'libero/libero/init_files'}' in text
     assert f'assets: {assets}' in text
+
+
+def test_evaluation_environment_uses_prepared_libero_source(tmp_path):
+    source = tmp_path / 'data/assets/libero_plus/source'
+    env = {'PYTHONPATH': '/existing/python/path'}
+    add_libero_source_to_pythonpath(env, source)
+    assert env['PYTHONPATH'] == f'{source}{os.pathsep}/existing/python/path'
+
 
 def test_libero_source_assets_link_replaces_checkout_placeholder(tmp_path):
     assets = tmp_path / 'assets'
