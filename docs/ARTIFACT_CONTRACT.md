@@ -96,6 +96,24 @@ LeRobot が生成する生の evaluation output は、各 suite directory 内に
 
 利用可能な場合は、environment / revision に関する情報も記録してください。
 
+test stage が正常完了した後、以下も記録してください。`stage_elapsed_seconds` は
+各 compute stage の実行時間の合計、`total_elapsed_seconds` は pipeline timestamp
+から test 完了までの wall-clock 時間であり、アセット準備および Slurm の待機時間を含みます。
+
+```json
+{
+  "pipeline_started_at": "20260913T120000+0900",
+  "pipeline_finished_at": "2026-09-13T03:45:12.345678+00:00",
+  "stage_elapsed_seconds": {
+    "preprocess": 42.1,
+    "train": 5180.4,
+    "test": 1090.7
+  },
+  "compute_elapsed_seconds": 6313.2,
+  "total_elapsed_seconds": 8245.6
+}
+```
+
 ---
 
 ## preprocess.json
@@ -116,6 +134,8 @@ libero_assets_path
 
 train stage は、この永続化された episode 選択結果を使用しなければなりません。
 
+`preprocess_started_at`、`preprocess_finished_at`、`preprocess_elapsed_seconds` も記録します。
+
 ---
 
 ## train.json
@@ -135,6 +155,8 @@ parameters_csv_path
 
 追跡可能性を確保するため、実際に使用した training command、または構造化された command arguments も含めてください。
 
+`training_elapsed_seconds` には stage 内の wall-clock 実行時間を記録します。
+
 ---
 
 ## test.json
@@ -152,6 +174,8 @@ video_paths
 ```
 
 実際に使用した evaluation configuration も含めてください。
+
+`evaluation_elapsed_seconds` には stage 内の wall-clock 実行時間を記録します。
 
 ---
 

@@ -1,8 +1,9 @@
 from __future__ import annotations
 import json, re
 from collections import defaultdict
+from datetime import datetime, timezone
 from pathlib import Path
-from .artifacts import write_json
+from .artifacts import elapsed_seconds, write_json
 from .config import DATASET_REPO, DATASET_REVISION, LIBERO_SOURCE_REPO, LIBERO_SOURCE_REVISION, SPATIAL_TASK_NAMES
 from .paths import ProjectPaths, ensure_run_layout
 from .prepare_assets import validate_assets
@@ -59,7 +60,9 @@ def load_episode_tasks(dataset: Path) -> list[object]:
 def preprocess() -> None:
     paths = ProjectPaths.from_environment()
     run = ensure_run_layout(paths)
+    started = datetime.now(timezone.utc)
     lock = validate_assets(paths)
     dataset = paths.project / lock['dataset']['local_path']
     indices, selected = select_spatial_episodes(load_episode_tasks(dataset))
-    write_json(run / 'manifests/preprocess.json', {'run_id': paths.run_id(), 'stage': 'preprocess', 'slurm_job_id': __import__('os').environ.get('SLURM_JOB_ID'), 'dataset_repo': DATASET_REPO, 'dataset_revision': DATASET_REVISION, 'selected_episode_indices': indices, 'selected_episode_count': len(indices), 'selected_by_task': selected, 'base_model_path': lock['base_model']['local_path'], 'dataset_path': lock['dataset']['local_path'], 'vlm_path': lock['vlm']['local_path'], 'resolved_vlm_revision': lock['vlm']['revision'], 'libero_assets_path': lock['libero_assets']['local_path'], 'libero_source_repo': LIBERO_SOURCE_REPO, 'libero_source_revision': LIBERO_SOURCE_REVISION, 'libero_source_path': lock['libero_source']['local_path']})
+    finished = datetime.now(timezone.utc)
+    write_json(run / 'manifests/preprocess.json', {'run_id': paths.run_id(), 'stage': 'preprocess', 'slurm_job_id': __import__('os').environ.get('SLURM_JOB_ID'), 'preprocess_started_at': started.isoformat(), 'preprocess_finished_at': finished.isoformat(), 'preprocess_elapsed_seconds': elapsed_seconds(started, finished), 'dataset_repo': DATASET_REPO, 'dataset_revision': DATASET_REVISION, 'selected_episode_indices': indices, 'selected_episode_count': len(indices), 'selected_by_task': selected, 'base_model_path': lock['base_model']['local_path'], 'dataset_path': lock['dataset']['local_path'], 'vlm_path': lock['vlm']['local_path'], 'resolved_vlm_revision': lock['vlm']['revision'], 'libero_assets_path': lock['libero_assets']['local_path'], 'libero_source_repo': LIBERO_SOURCE_REPO, 'libero_source_revision': LIBERO_SOURCE_REVISION, 'libero_source_path': lock['libero_source']['local_path']})
