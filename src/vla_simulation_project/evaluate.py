@@ -22,8 +22,9 @@ def add_libero_source_to_pythonpath(env: dict[str, str], source: Path) -> None:
     env['PYTHONPATH'] = str(source) if not existing else f'{source}{os.pathsep}{existing}'
 
 
-def build_eval_command(policy: Path, output: Path, suite: str, config: ExperimentConfig, vlm_path: Path) -> list[str]:
-    return ['lerobot-eval', f'--policy.path={policy}', f'--policy.vlm_model_name={vlm_path}', '--policy.device=cuda', '--policy.use_amp=false', '--env.type=libero', '--env.is_libero_plus=true', f'--env.task={suite}', '--env.task_ids=' + json.dumps(list(config.task_ids), separators=(',', ':')), '--env.camera_name_mapping=' + json.dumps(CAMERAS, separators=(',', ':')), '--env.observation_height=256', '--env.observation_width=256', '--env.control_mode=relative', '--env.max_parallel_tasks=1', '--eval.batch_size=1', f'--eval.n_episodes={config.episodes_per_task}', '--eval.use_async_envs=false', '--eval.recording=false', f'--seed={config.evaluation_seed}', f'--output_dir={output}']
+def build_eval_command(policy: Path, output: Path, suite: str, config: ExperimentConfig, vlm_path: Path, task_ids: list[int] | None = None) -> list[str]:
+    effective_ids = task_ids if task_ids is not None else list(config.task_ids)
+    return ['lerobot-eval', f'--policy.path={policy}', f'--policy.vlm_model_name={vlm_path}', '--policy.device=cuda', '--policy.use_amp=false', '--env.type=libero', '--env.is_libero_plus=true', f'--env.task={suite}', '--env.task_ids=' + json.dumps(effective_ids, separators=(',', ':')), '--env.camera_name_mapping=' + json.dumps(CAMERAS, separators=(',', ':')), '--env.observation_height=256', '--env.observation_width=256', '--env.control_mode=relative', '--env.max_parallel_tasks=1', '--eval.batch_size=1', f'--eval.n_episodes={config.episodes_per_task}', '--eval.use_async_envs=false', '--eval.recording=false', f'--seed={config.evaluation_seed}', f'--output_dir={output}']
 
 def create_libero_config(run: Path, source: Path, assets: Path) -> Path:
     """Configure uv-managed LIBERO Python to use login-prepared benchmark data."""
@@ -70,11 +71,24 @@ def evaluate() -> None:
     vlm_path = paths.project / lock['vlm']['local_path']
     env['LIBERO_CONFIG_PATH'] = str(create_libero_config(run, libero_source, paths.project / lock['libero_assets']['local_path']))
     add_libero_source_to_pythonpath(env, libero_source)
+
+    task_selection = None
+    if config.auto_select_enabled:
+        from .select_tasks import load_task_classification, select_tasks, TASK_CLASSIFICATION_FILENAME
+        classification_path = _resource_root(libero_source) / 'benchmark' / TASK_CLASSIFICATION_FILENAME
+        classification = load_task_classification(classification_path)
+        task_selection = {suite: select_tasks(classification[suite], config.auto_select_n_tasks) for suite in SUITES}
+        write_json(run / 'task_selection.json', task_selection)
+
     rows, videos, commands = ([], {}, {})
     names = {'libero_spatial': 'spatial', 'libero_object': 'object', 'libero_goal': 'goal', 'libero_10': 'libero10'}
     for suite in SUITES:
         output = run / 'eval' / suite
-        command = build_eval_command(policy, output, suite, config, vlm_path)
+        if config.auto_select_enabled and task_selection:
+            selected_ids = sorted(entry['task_id'] for entry in task_selection[suite])
+            command = build_eval_command(policy, output, suite, config, vlm_path, task_ids=selected_ids)
+        else:
+            command = build_eval_command(policy, output, suite, config, vlm_path)
         commands[suite] = command
         run_command('test', command, cwd=paths.project, env=env)
         info = read_json(output / 'eval_info.json')
@@ -84,8 +98,9 @@ def evaluate() -> None:
         videos[suite] = str(target)
     results = run / f'{paths.run_id()}_results.csv'
     write_results_csv(results, rows)
+    effective_task_ids = sorted(entry['task_id'] for suite_entries in task_selection.values() for entry in suite_entries) if config.auto_select_enabled and task_selection else list(config.task_ids)
     finished = datetime.now(timezone.utc)
-    write_json(run / 'manifests/test.json', {'run_id': paths.run_id(), 'stage': 'test', 'slurm_job_id': os.environ.get('SLURM_JOB_ID'), 'evaluation_started_at': started.isoformat(), 'evaluation_finished_at': finished.isoformat(), 'evaluation_elapsed_seconds': elapsed_seconds(started, finished), 'suites': list(SUITES), 'task_ids': list(config.task_ids), 'episodes_per_task': config.episodes_per_task, 'results_csv_path': str(results), 'video_paths': videos, 'commands': commands})
+    write_json(run / 'manifests/test.json', {'run_id': paths.run_id(), 'stage': 'test', 'slurm_job_id': os.environ.get('SLURM_JOB_ID'), 'evaluation_started_at': started.isoformat(), 'evaluation_finished_at': finished.isoformat(), 'evaluation_elapsed_seconds': elapsed_seconds(started, finished), 'suites': list(SUITES), 'task_ids': effective_task_ids, 'episodes_per_task': config.episodes_per_task, 'results_csv_path': str(results), 'video_paths': videos, 'commands': commands})
     validate_final_artifacts(run, paths.run_id(), SUITES)
     summary = finalize_run_timing(run, datetime.now(timezone.utc))
     print(f"Total pipeline elapsed time: {summary['total_elapsed_seconds']:.3f} seconds")

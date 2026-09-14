@@ -14,5 +14,9 @@ task_ids = [0, 4, 8]
 episodes_per_task = 1
 seed = 2026
 
+[evaluation.auto_select]
+enabled = false
+n_tasks = 100
+
 [evaluation.video]
 task_id = 0

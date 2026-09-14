@@ -9,11 +9,12 @@ from vla_simulation_project.evaluate import add_libero_source_to_pythonpath, bui
 from vla_simulation_project.paths import ProjectPaths
 from vla_simulation_project.prepare_assets import _extract_assets, _localize_tokenizer_config, _link_libero_assets, _snapshot, tqdm, validate_assets
 from vla_simulation_project.preprocess import choose_evenly_spaced, normalize_task_name, select_spatial_episodes
+from vla_simulation_project.select_tasks import load_task_classification, select_tasks
 from vla_simulation_project.train import build_train_command
-from vla_simulation_project.config import LIBERO_SOURCE_REPO, LIBERO_SOURCE_REVISION, SPATIAL_TASK_NAMES
+from vla_simulation_project.config import LIBERO_SOURCE_REPO, LIBERO_SOURCE_REVISION, SPATIAL_TASK_NAMES, ExperimentConfig, load_config
 
 def config():
-    return SimpleNamespace(steps=3000, batch_size=1, learning_rate=0.0003, final_learning_rate=3e-05, warmup_steps=100, lora_r=16, lora_alpha=16, log_freq=100, seed=42, task_ids=(0, 4, 8), episodes_per_task=1, evaluation_seed=2026, video_task_id=0)
+    return SimpleNamespace(steps=3000, batch_size=1, learning_rate=0.0003, final_learning_rate=3e-05, warmup_steps=100, lora_r=16, lora_alpha=16, log_freq=100, seed=42, task_ids=(0, 4, 8), episodes_per_task=1, evaluation_seed=2026, video_task_id=0, auto_select_enabled=False, auto_select_n_tasks=100)
 
 def test_run_path_and_run_id(monkeypatch, tmp_path):
     run = tmp_path / 'data/outputs/20260910T000000Z-ab12'
@@ -138,6 +139,66 @@ def test_train_and_eval_commands_are_local_and_semantic(tmp_path):
     evaluate = build_eval_command(Path('model'), Path('out'), 'libero_goal', config(), Path('data/models/vlm'))
     assert '--env.task=libero_goal' in evaluate and '--env.task_ids=[0,4,8]' in evaluate and ('--eval.n_episodes=1' in evaluate)
     assert '--policy.vlm_model_name=data/models/vlm' in evaluate
+
+
+def test_build_eval_command_with_auto_select_task_ids(tmp_path):
+    command = build_eval_command(Path('model'), Path('out'), 'libero_spatial', config(), Path('data/models/vlm'), task_ids=[0, 23, 45])
+    assert '--env.task_ids=[0,23,45]' in command
+
+
+def _classification_fixture():
+    tasks = []
+    categories = [('Background Textures', 10), ('Camera Viewpoints', 16), ('Language Instructions', 16), ('Light Conditions', 12), ('Objects Layout', 16), ('Robot Initial States', 15), ('Sensor Noise', 15)]
+    task_id = 1
+    for cat, count in categories:
+        for _ in range(count):
+            tasks.append({'id': task_id, 'name': f'task_{task_id}', 'category': cat, 'difficulty_level': (task_id % 5) + 1})
+            task_id += 1
+    return {'libero_spatial': tasks}
+
+
+def test_select_tasks_returns_100_entries_per_suite():
+    selection = select_tasks(_classification_fixture()['libero_spatial'], 100)
+    assert len(selection) == 100
+    assert len({entry['task_id'] for entry in selection}) == 100
+
+
+def test_select_tasks_preserves_category_ratios():
+    selection = select_tasks(_classification_fixture()['libero_spatial'], 100)
+    counts = {}
+    for entry in selection:
+        counts[entry['category']] = counts.get(entry['category'], 0) + 1
+    assert counts == {'Background Textures': 10, 'Camera Viewpoints': 16, 'Language Instructions': 16, 'Light Conditions': 12, 'Objects Layout': 16, 'Robot Initial States': 15, 'Sensor Noise': 15}
+
+
+def test_select_tasks_is_deterministic():
+    first = select_tasks(_classification_fixture()['libero_spatial'], 100)
+    second = select_tasks(_classification_fixture()['libero_spatial'], 100)
+    assert first == second
+
+
+def test_select_tasks_task_id_is_zero_based():
+    selection = select_tasks(_classification_fixture()['libero_spatial'], 100)
+    assert all(0 <= entry['task_id'] <= 99 for entry in selection)
+    assert min(entry['task_id'] for entry in selection) == 0
+    assert max(entry['task_id'] for entry in selection) == 99
+
+
+def test_load_task_classification_validates_missing_file(tmp_path):
+    with pytest.raises(FileNotFoundError, match='task classification'):
+        load_task_classification(tmp_path / 'missing.json')
+
+
+def test_load_task_classification_validates_invalid_json(tmp_path):
+    bad = tmp_path / 'bad.json'
+    bad.write_text('not json')
+    with pytest.raises(ValueError, match='invalid task classification'):
+        load_task_classification(bad)
+
+
+def test_select_tasks_rejects_empty_task_list():
+    with pytest.raises(ValueError, match='empty task list'):
+        select_tasks([], 100)
 
 def test_results_use_actual_episode_success_values(tmp_path):
     info = {'per_task': [{'task_id': 0, 'metrics': {'successes': [True, False]}}, {'task_id': 4, 'metrics': {'successes': [True]}}]}
