@@ -345,6 +345,7 @@ final_homework_Advanced.ipynb
 
 ドキュメント間で内容が矛盾する場合は、`AGENTS.md` と `TASK.md` を優先してください。
 
+## prepare-assetsの制約
 `prepare-assets` はログインノード上で行うアセットのステージング処理であり、計算ノード実行時の処理ではありません。
 
 その実装は、計算用 Singularity イメージの起動に依存してはいけません。
