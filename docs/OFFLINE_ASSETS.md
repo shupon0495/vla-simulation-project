@@ -18,7 +18,7 @@ singularity/login.sif
 
 ログインノードの system Python は使用せず、compute image も起動しません。
 
-`login.sif` には `prepare-assets` に必要な最小限の Python 環境（`huggingface_hub` と `tqdm`）がイメージ内に組み込まれており、プロジェクトの `.venv`（CUDA を含む）は読み込みません。これによりログインノードでの起動時間を抑えています。
+`login.sif` には `prepare-assets` に必要な最小限の Python 環境（`huggingface_hub` と `tqdm`）がイメージ内に組み込まれており、プロジェクトの `.venv`（CUDA を含む）は読み込みません。これによりログインノードでの起動時間を抑えています。システム Python は Debian の externally-managed 配下にあるため、イメージビルド時は `--break-system-packages` でインストールします。
 
 計算ノード用の `.venv` は、`submit_pipeline.sh` の投入前に `uv sync --frozen --check` による差分確認を行い、差分があるときだけ `uv sync --frozen` で更新します。
 

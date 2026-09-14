@@ -87,7 +87,7 @@ Asset preparation は、`singularity/login.def` から作成された専用の `
 
 これにより、ログインノードの system Python のバージョン、および compute image の両方から独立させます。
 
-`login.sif` には `prepare-assets` に必要な最小限の Python 環境（`huggingface_hub` と `tqdm`）がイメージ内に組み込まれており、CUDA を含むプロジェクトの `.venv` は読み込みません。これによりログインノードでの準備処理の起動を高速化しています。
+`login.sif` には `prepare-assets` に必要な最小限の Python 環境（`huggingface_hub` と `tqdm`）がイメージ内に組み込まれており、CUDA を含むプロジェクトの `.venv` は読み込みません。これによりログインノードでの準備処理の起動を高速化しています。システム Python は Debian の externally-managed 配下にあるため、イメージビルド時は `uv pip install --system --break-system-packages` で明示的にイメージ内へインストールします。
 
 計算ノード用の `.venv` は、`submit_pipeline.sh` の投入前に `uv sync --frozen --check` による差分確認を行い、差分があるときだけ同期します。
 
