@@ -34,22 +34,29 @@ else
     echo "Login-node asset preparation image is up to date."
 fi
 
-# コンテナ実行
-# 実行のための応急処置としてuv sync --frozenを追加している
-# uv環境をloginとcomputeで共有しているのは修正したほうが良い
-singularity exec \
-    --bind "$PROJECT:$PROJECT" \
-    --pwd "$PROJECT" \
-    "$PROJECT/singularity/login.sif" \
-    uv sync --frozen
+# 計算ノード用 .venv は差分があるときだけ同期する
+# uv sync --check は環境が lockfile と一致していれば即座に成功終了するため、
+# 定常状態では CUDA を含む大きな wheel の再展開は起こらない
+if ! singularity exec \
+        --bind "$PROJECT:$PROJECT" \
+        --pwd "$PROJECT" \
+        "$LOGIN_SIF" \
+        uv sync --frozen --check; then
+    singularity exec \
+        --bind "$PROJECT:$PROJECT" \
+        --pwd "$PROJECT" \
+        "$LOGIN_SIF" \
+        uv sync --frozen
+fi
 
-# jobを投げる
+# prepare-assets は login.sif 内蔵の最小Python環境( huggingface-hub + tqdm )で
+# 直接実行し、CUDA を含むプロジェクトの .venv を読み込まない
 singularity exec \
     --bind "$PROJECT:$PROJECT" \
     --pwd "$PROJECT" \
-    --env "PROJECT=$PROJECT,RUN_ID=$RUN_ID,RUN_DIR=$RUN_DIR,PYTHONPATH=$PROJECT/src" \
+    --env "PROJECT=$PROJECT,RUN_ID=$RUN_ID,RUN_DIR=$RUN_DIR,PYTHONPATH=$PROJECT/src,HF_HOME=$PROJECT/data/hf_cache" \
     "$LOGIN_SIF" \
-    uv run --frozen python -m vla_simulation_project.main prepare-assets
+    python3.12 -m vla_simulation_project.main prepare-assets
 printf '{\n  "run_id": "%s",\n  "timestamp": "%s",\n  "run_dir": "%s",\n  "build_job_id": null,\n  "preprocess_job_id": null,\n  "train_job_id": null,\n  "test_job_id": null\n}\n' \
     "$RUN_ID" "$TIMESTAMP" "$RUN_DIR" > "$RUN_DIR/manifests/run.json"
 

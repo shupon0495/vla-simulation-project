@@ -349,3 +349,7 @@ final_homework_Advanced.ipynb
 `prepare-assets` はログインノード上で行うアセットのステージング処理であり、計算ノード実行時の処理ではありません。
 
 その実装は、計算用 Singularity イメージの起動に依存してはいけません。
+
+`prepare-assets` は、`singularity/login.sif` 内蔵の最小限の Python 環境（`huggingface-hub` と `tqdm`）で直接実行し、プロジェクトの `.venv`（CUDA を含む）は読み込みません。
+
+計算ノード用の `.venv` は、`uv sync --frozen --check` で差分があるときだけ同期することで、ログインノードでの起動を高速化しています。

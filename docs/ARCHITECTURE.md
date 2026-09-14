@@ -87,7 +87,11 @@ Asset preparation は、`singularity/login.def` から作成された専用の `
 
 これにより、ログインノードの system Python のバージョン、および compute image の両方から独立させます。
 
-プロジェクトの uv 環境から `huggingface_hub` を利用し、asset のダウンロード中には snapshot の進捗表示を行います。
+`login.sif` には `prepare-assets` に必要な最小限の Python 環境（`huggingface_hub` と `tqdm`）がイメージ内に組み込まれており、CUDA を含むプロジェクトの `.venv` は読み込みません。これによりログインノードでの準備処理の起動を高速化しています。
+
+計算ノード用の `.venv` は、`submit_pipeline.sh` の投入前に `uv sync --frozen --check` による差分確認を行い、差分があるときだけ同期します。
+
+asset のダウンロード中には snapshot の進捗表示を行います。
 
 ### Compute node
 

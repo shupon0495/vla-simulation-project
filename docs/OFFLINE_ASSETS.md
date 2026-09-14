@@ -18,6 +18,10 @@ singularity/login.sif
 
 ログインノードの system Python は使用せず、compute image も起動しません。
 
+`login.sif` には `prepare-assets` に必要な最小限の Python 環境（`huggingface_hub` と `tqdm`）がイメージ内に組み込まれており、プロジェクトの `.venv`（CUDA を含む）は読み込みません。これによりログインノードでの起動時間を抑えています。
+
+計算ノード用の `.venv` は、`submit_pipeline.sh` の投入前に `uv sync --frozen --check` による差分確認を行い、差分があるときだけ `uv sync --frozen` で更新します。
+
 Hugging Face の repository は、`huggingface_hub.snapshot_download` を使用してローカルへ配置します。
 
 長時間の dataset 転送中でも、submission terminal から進捗を確認できるように、file および byte 単位の progress indicator は有効なままにしてください。
