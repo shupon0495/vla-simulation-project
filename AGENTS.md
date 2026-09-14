@@ -352,4 +352,6 @@ final_homework_Advanced.ipynb
 
 `prepare-assets` は、`singularity/login.sif` 内蔵の最小限の Python 環境（`huggingface-hub` と `tqdm`）で直接実行し、プロジェクトの `.venv`（CUDA を含む）は読み込みません。
 
+`login.sif` のシステム Python は Debian の externally-managed 配下にあるため、イメージビルド時の `uv pip install --system` には `--break-system-packages` を付けて明示的にイメージ内へインストールしてください。イメージは隔離された使い捨て環境であり、ホストの Python には影響しません。
+
 計算ノード用の `.venv` は、`uv sync --frozen --check` で差分があるときだけ同期することで、ログインノードでの起動を高速化しています。

@@ -254,7 +254,9 @@ def test_asset_preparation_uses_dedicated_python312_login_image():
     assert 'uv sync --frozen --check' in submit
     assert 'From: ubuntu:24.04' in login_def
     assert "python3.12 -c 'import tomllib'" in login_def
-    assert 'uv pip install --system --python /usr/bin/python3.12' in login_def
+    # システム Python は externally-managed 配下にあるため
+    # --break-system-packages を付けて明示的にイメージ内へインストールする
+    assert 'uv pip install --system --break-system-packages --python /usr/bin/python3.12' in login_def
     assert 'huggingface-hub>=1.0.0,<2.0.0' in login_def
     assert 'tqdm>=4.66.0,<5.0.0' in login_def
 

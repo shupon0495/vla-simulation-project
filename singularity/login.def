@@ -17,7 +17,10 @@ From: ubuntu:24.04
     # prepare-assets 専用の最小環境をイメージに組み込む。
     # プロジェクトの .venv（CUDA を含む重い依存）は読み込まない。
     # バージョン範囲は pyproject.toml の制約と揃える。
-    uv pip install --system --python /usr/bin/python3.12 \
+    # システム Python は Debian の externally-managed 配下にあるため、
+    # --break-system-packages を付けて明示的にイメージ内へインストールする。
+    # イメージは使い捨ての隔離環境であり、ホストの Python には影響しない。
+    uv pip install --system --break-system-packages --python /usr/bin/python3.12 \
         "huggingface-hub>=1.0.0,<2.0.0" "tqdm>=4.66.0,<5.0.0"
 
 %environment
