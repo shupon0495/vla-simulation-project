@@ -50,6 +50,8 @@ def build_train_command(config: ExperimentConfig, preprocess_manifest: dict, run
         '--peft.method_type=LORA',
         f'--peft.r={config.lora_r}',
         f'--peft.lora_alpha={config.lora_alpha}',
+        f'--policy.chunk_size={config.chunk_size}',
+        f'--policy.n_action_steps={config.n_action_steps}',
     ]
 
 def offline_environment(paths: ProjectPaths) -> dict[str, str]:

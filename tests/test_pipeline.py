@@ -14,7 +14,7 @@ from vla_simulation_project.train import build_train_command
 from vla_simulation_project.config import LIBERO_SOURCE_REPO, LIBERO_SOURCE_REVISION, SPATIAL_TASK_NAMES, ExperimentConfig, load_config
 
 def config():
-    return SimpleNamespace(steps=3000, batch_size=1, learning_rate=0.0003, final_learning_rate=3e-05, warmup_steps=100, lora_r=16, lora_alpha=16, log_freq=100, seed=42, task_ids=(0, 4, 8), episodes_per_task=1, evaluation_seed=2026, video_task_id=0, auto_select_enabled=False, auto_select_n_tasks=100)
+    return SimpleNamespace(steps=3000, batch_size=1, learning_rate=0.0003, final_learning_rate=3e-05, warmup_steps=100, lora_r=16, lora_alpha=16, log_freq=100, seed=42, chunk_size=50, n_action_steps=50, task_ids=(0, 4, 8), episodes_per_task=1, evaluation_seed=2026, video_task_id=0, auto_select_enabled=False, auto_select_n_tasks=100)
 
 def test_run_path_and_run_id(monkeypatch, tmp_path):
     run = tmp_path / 'data/outputs/20260910T000000Z-ab12'
