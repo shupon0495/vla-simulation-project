@@ -37,6 +37,8 @@ class ExperimentConfig:
     lora_alpha: int
     log_freq: int
     seed: int
+    chunk_size: int
+    n_action_steps: int
     task_ids: tuple[int, ...]
     episodes_per_task: int
     evaluation_seed: int
@@ -50,6 +52,7 @@ def load_config(project: Path) -> ExperimentConfig:
         (project / 'config/experiment.toml').read_text(encoding='utf-8')
     )
     t, e = (raw['training'], raw['evaluation'])
+    policy = t.get('policy', {})
     auto_select = e.get('auto_select', {})
     cfg = ExperimentConfig(
         steps=t['steps'],
@@ -61,6 +64,8 @@ def load_config(project: Path) -> ExperimentConfig:
         lora_alpha=t['lora_alpha'],
         log_freq=t['log_freq'],
         seed=t['seed'],
+        chunk_size=policy.get('chunk_size', 50),
+        n_action_steps=policy.get('n_action_steps', 50),
         task_ids=tuple(e['task_ids']),
         episodes_per_task=e['episodes_per_task'],
         evaluation_seed=e['seed'],

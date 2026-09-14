@@ -9,6 +9,10 @@ lora_alpha = 16
 log_freq = 100
 seed = 42
 
+[training.policy]
+chunk_size = 50
+n_action_steps = 50
+
 [evaluation]
 task_ids = [0, 4, 8]
 episodes_per_task = 1
