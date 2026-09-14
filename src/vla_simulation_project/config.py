@@ -41,6 +41,8 @@ class ExperimentConfig:
     episodes_per_task: int
     evaluation_seed: int
     video_task_id: int
+    auto_select_enabled: bool
+    auto_select_n_tasks: int
 
 
 def load_config(project: Path) -> ExperimentConfig:
@@ -48,6 +50,7 @@ def load_config(project: Path) -> ExperimentConfig:
         (project / 'config/experiment.toml').read_text(encoding='utf-8')
     )
     t, e = (raw['training'], raw['evaluation'])
+    auto_select = e.get('auto_select', {})
     cfg = ExperimentConfig(
         steps=t['steps'],
         batch_size=t['batch_size'],
@@ -62,6 +65,8 @@ def load_config(project: Path) -> ExperimentConfig:
         episodes_per_task=e['episodes_per_task'],
         evaluation_seed=e['seed'],
         video_task_id=e['video']['task_id'],
+        auto_select_enabled=auto_select.get('enabled', False),
+        auto_select_n_tasks=auto_select.get('n_tasks', 100),
     )
     positive = (
         cfg.steps,
@@ -72,12 +77,11 @@ def load_config(project: Path) -> ExperimentConfig:
         cfg.log_freq,
         cfg.episodes_per_task,
     )
-    if (
-        any(v < 1 for v in positive)
-        or not cfg.task_ids
-        or any(v not in range(10) for v in cfg.task_ids)
-    ):
+    if any(v < 1 for v in positive):
         raise ValueError('invalid experiment configuration')
+    if not cfg.auto_select_enabled:
+        if not cfg.task_ids or any(v not in range(10) for v in cfg.task_ids):
+            raise ValueError('invalid experiment configuration')
     if cfg.video_task_id not in cfg.task_ids:
         raise ValueError('evaluation.video.task_id must be included in evaluation.task_ids')
     return cfg
