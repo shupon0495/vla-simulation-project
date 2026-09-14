@@ -185,10 +185,17 @@ def test_asset_preparation_uses_dedicated_python312_login_image():
     submit = (root / 'submit_pipeline.sh').read_text()
     login_def = (root / 'singularity/login.def').read_text()
     assert '"$LOGIN_SIF"' in submit
-    assert 'uv run --frozen python -m vla_simulation_project.main prepare-assets' in submit
-    assert 'python3 -m vla_simulation_project.main prepare-assets' not in submit
+    # prepare-assets はプロジェクトの .venv を経由せず、
+    # login.sif 内蔵の最小環境で直接実行する
+    assert 'python3.12 -m vla_simulation_project.main prepare-assets' in submit
+    assert 'uv run --frozen python -m vla_simulation_project.main prepare-assets' not in submit
+    # 計算用 .venv は差分があるときだけ同期する
+    assert 'uv sync --frozen --check' in submit
     assert 'From: ubuntu:24.04' in login_def
     assert "python3.12 -c 'import tomllib'" in login_def
+    assert 'uv pip install --system --python /usr/bin/python3.12' in login_def
+    assert 'huggingface-hub>=1.0.0,<2.0.0' in login_def
+    assert 'tqdm>=4.66.0,<5.0.0' in login_def
 
 def test_slurm_log_paths_use_submission_timestamp():
     submit = (Path(__file__).parents[1] / 'submit_pipeline.sh').read_text()
