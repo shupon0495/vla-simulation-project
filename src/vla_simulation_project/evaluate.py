@@ -1,5 +1,5 @@
 from __future__ import annotations
-import json, os, shutil
+import json, os, shutil, sys
 from datetime import datetime, timezone
 from pathlib import Path
 from .artifacts import elapsed_seconds, finalize_run_timing, read_json, result_rows, validate_final_artifacts, validate_policy_directory, write_json, write_results_csv
@@ -24,7 +24,8 @@ def add_libero_source_to_pythonpath(env: dict[str, str], source: Path) -> None:
 
 def build_eval_command(policy: Path, output: Path, suite: str, config: ExperimentConfig, vlm_path: Path, task_ids: list[int] | None = None) -> list[str]:
     effective_ids = task_ids if task_ids is not None else list(config.task_ids)
-    return ['lerobot-eval', f'--policy.path={policy}', f'--policy.vlm_model_name={vlm_path}', '--policy.device=cuda', '--policy.use_amp=false', '--env.type=libero', '--env.is_libero_plus=true', f'--env.task={suite}', '--env.task_ids=' + json.dumps(effective_ids, separators=(',', ':')), '--env.camera_name_mapping=' + json.dumps(CAMERAS, separators=(',', ':')), '--env.observation_height=256', '--env.observation_width=256', '--env.control_mode=relative', '--env.max_parallel_tasks=1', '--eval.batch_size=1', f'--eval.n_episodes={config.episodes_per_task}', '--eval.use_async_envs=false', '--eval.recording=false', f'--seed={config.evaluation_seed}', f'--output_dir={output}']
+    python_cmd = os.environ.get('_LEROBOT_PYTHON', sys.executable)
+    return [python_cmd, '-m', 'vla_simulation_project._lerobot_eval', f'--policy.path={policy}', f'--policy.vlm_model_name={vlm_path}', '--policy.device=cuda', '--policy.use_amp=false', '--env.type=libero', '--env.is_libero_plus=true', f'--env.task={suite}', '--env.task_ids=' + json.dumps(effective_ids, separators=(',', ':')), '--env.camera_name_mapping=' + json.dumps(CAMERAS, separators=(',', ':')), '--env.observation_height=256', '--env.observation_width=256', '--env.control_mode=relative', '--env.max_parallel_tasks=1', '--eval.batch_size=1', f'--eval.n_episodes={config.episodes_per_task}', '--eval.use_async_envs=false', '--eval.recording=false', f'--seed={config.evaluation_seed}', f'--output_dir={output}']
 
 def create_libero_config(run: Path, source: Path, assets: Path) -> Path:
     """Configure uv-managed LIBERO Python to use login-prepared benchmark data."""
@@ -67,6 +68,7 @@ def evaluate() -> None:
     config = load_config(paths.project)
     env = offline_environment(paths)
     env['MUJOCO_GL'] = 'egl'
+    env['_LEROBOT_PYTHON'] = sys.executable
     libero_source = paths.project / lock['libero_source']['local_path']
     vlm_path = paths.project / lock['vlm']['local_path']
     env['LIBERO_CONFIG_PATH'] = str(create_libero_config(run, libero_source, paths.project / lock['libero_assets']['local_path']))
