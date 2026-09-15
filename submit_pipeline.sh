@@ -44,17 +44,31 @@ fi
 # 定常状態では CUDA を含む大きな wheel の再展開は起こらない
 # 計算ノード(ng-dgx-m2)は aarch64 だがログインノードは x86_64 のため、
 # --python-platform で計算ノード向けの wheel をキャッシュ・同期する
+# evdev は sdist しかなく C 拡張のため x86_64 上で aarch64 向けにクロスビルド
+# できない。フル同期は evdev で失敗するが、その時点で全 aarch64 wheel と
+# evdev sdist がキャッシュされる。計算ノード上で evdev をキャッシュされた
+# sdist からネイティブビルドするため、evdev を除外して .venv を完成させる。
 COMPUTE_PLATFORM=aarch64-unknown-linux-gnu
 if ! singularity exec \
         --bind "$PROJECT:$PROJECT" \
         --pwd "$PROJECT" \
         "$LOGIN_SIF" \
-        uv sync --frozen --check --python-platform "$COMPUTE_PLATFORM"; then
-    singularity exec \
-        --bind "$PROJECT:$PROJECT" \
-        --pwd "$PROJECT" \
-        "$LOGIN_SIF" \
-        uv sync --frozen --python-platform "$COMPUTE_PLATFORM"
+        uv sync --frozen --check --python-platform "$COMPUTE_PLATFORM" \
+            --no-build-package evdev --no-install-package evdev; then
+    # フル同期を試行（全 aarch64 wheel + evdev sdist をキャッシュ）
+    if ! singularity exec \
+            --bind "$PROJECT:$PROJECT" \
+            --pwd "$PROJECT" \
+            "$LOGIN_SIF" \
+            uv sync --frozen --python-platform "$COMPUTE_PLATFORM"; then
+        # evdev のクロスビルド失敗は想定済み。evdev を除外して .venv を完成
+        singularity exec \
+                --bind "$PROJECT:$PROJECT" \
+                --pwd "$PROJECT" \
+                "$LOGIN_SIF" \
+                uv sync --frozen --python-platform "$COMPUTE_PLATFORM" \
+                    --no-build-package evdev --no-install-package evdev
+    fi
 fi
 
 # prepare-assets は login.sif 内蔵の最小Python環境( huggingface-hub + tqdm )で
