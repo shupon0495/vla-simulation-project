@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --job-name=preprocess
+#SBATCH --job-name=prepro
 #SBATCH --time=01:00:00
 #SBATCH --nodes=1
 
