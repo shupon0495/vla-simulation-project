@@ -55,6 +55,22 @@ def _task_video(info: dict, task_id: int, output: Path) -> Path:
         raise FileNotFoundError(f'test: evaluation did not produce a video for task {task_id} under {output}')
     return candidates[0]
 
+def prune_rendered_videos(output: Path, run: Path) -> None:
+    """Delete lerobot-eval's intermediate rendered videos for one suite.
+
+    lerobot-eval renders up to ``max_episodes_rendered`` videos per task, but
+    the artifact contract requires exactly one final video per suite, which is
+    copied to the run root before this cleanup.  Deletion is refused for any
+    path outside the run directory.
+    """
+    videos = output / 'videos'
+    if not videos.is_dir():
+        return
+    resolved, root = (videos.resolve(), run.resolve())
+    if resolved == root or not resolved.is_relative_to(root):
+        raise ValueError(f'test: refusing to delete directory outside the run: {resolved}')
+    shutil.rmtree(resolved)
+
 def evaluate() -> None:
     paths = ProjectPaths.from_environment()
     run = ensure_run_layout(paths)
@@ -97,6 +113,7 @@ def evaluate() -> None:
         rows.extend(result_rows(paths.run_id(), suite, info))
         target = run / f'{paths.run_id()}_{names[suite]}.mp4'
         shutil.copy2(_task_video(info, config.video_task_id, output), target)
+        prune_rendered_videos(output, run)
         videos[suite] = str(target)
     results = run / f'{paths.run_id()}_results.csv'
     write_results_csv(results, rows)

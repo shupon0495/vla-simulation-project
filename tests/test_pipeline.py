@@ -5,7 +5,7 @@ from pathlib import Path
 from types import SimpleNamespace
 import pytest
 from vla_simulation_project.artifacts import finalize_run_timing, result_rows, validate_final_artifacts, write_json, write_parameter_csv, write_results_csv
-from vla_simulation_project.evaluate import add_libero_source_to_pythonpath, build_eval_command, create_libero_config
+from vla_simulation_project.evaluate import add_libero_source_to_pythonpath, build_eval_command, create_libero_config, prune_rendered_videos
 from vla_simulation_project.paths import ProjectPaths
 from vla_simulation_project.prepare_assets import _extract_assets, _localize_tokenizer_config, _link_libero_assets, _snapshot, tqdm, validate_assets
 from vla_simulation_project.preprocess import choose_evenly_spaced, normalize_task_name, select_spatial_episodes
@@ -144,6 +144,29 @@ def test_train_and_eval_commands_are_local_and_semantic(tmp_path):
 def test_build_eval_command_with_auto_select_task_ids(tmp_path):
     command = build_eval_command(Path('model'), Path('out'), 'libero_spatial', config(), Path('data/models/vlm'), task_ids=[0, 23, 45])
     assert '--env.task_ids=[0,23,45]' in command
+
+
+def test_prune_rendered_videos_removes_only_run_managed_directory(tmp_path):
+    run = tmp_path / 'run'
+    videos = run / 'eval/libero_spatial/videos/libero_spatial_0'
+    videos.mkdir(parents=True)
+    (videos / 'eval_episode_0.mp4').write_text('x')
+    (run / 'eval/libero_spatial/eval_info.json').write_text('{}')
+    prune_rendered_videos(run / 'eval/libero_spatial', run)
+    assert not (run / 'eval/libero_spatial/videos').exists()
+    assert (run / 'eval/libero_spatial/eval_info.json').is_file()
+    prune_rendered_videos(run / 'eval/libero_spatial', run)
+    outside = tmp_path / 'elsewhere'
+    (outside / 'videos').mkdir(parents=True)
+    with pytest.raises(ValueError, match='outside the run'):
+        prune_rendered_videos(outside, run)
+    link = run / 'eval/libero_goal'
+    link.mkdir(parents=True)
+    (outside / 'videos/keep.mp4').write_text('x')
+    (link / 'videos').symlink_to(outside / 'videos')
+    with pytest.raises(ValueError, match='outside the run'):
+        prune_rendered_videos(link, run)
+    assert (outside / 'videos/keep.mp4').is_file()
 
 
 def _classification_fixture():
