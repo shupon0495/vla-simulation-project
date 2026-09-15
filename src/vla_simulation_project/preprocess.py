@@ -53,8 +53,8 @@ def load_episode_tasks(dataset: Path) -> list[object]:
         return tasks
     parquet = sorted((dataset / 'meta/episodes').rglob('*.parquet'))
     if parquet:
-        import pyarrow.parquet as pq
-        return [value for file in parquet for value in pq.read_table(file, columns=['tasks'])['tasks'].to_pylist()]
+        import pandas as pd
+        return [value for file in parquet for value in pd.read_parquet(file)['tasks'].tolist()]
     raise FileNotFoundError(f'preprocess: local episode metadata missing under {dataset}; rerun prepare-assets on the login node')
 
 def preprocess() -> None:

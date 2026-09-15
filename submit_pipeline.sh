@@ -13,12 +13,6 @@ export PROJECT=${PROJECT:-$SCRIPT_DIR}
 # パスや環境変数を導入
 source "$PROJECT/slurm/config.sh"
 
-# uv のキャッシュをプロジェクト内に配置し、ログインノードと計算ノード間で共有する。
-# 計算ノードは --offline で uv run するため、キャッシュがプロジェクトの
-# バインドマウント配下にないと wheel が見つからず sdist からビルドされてしまう。
-export UV_CACHE_DIR="$PROJECT/.uv-cache"
-mkdir -p "$UV_CACHE_DIR"
-
 # RUN_IDを作成して公開
 RUN_ID=$(date +%s%N | sha256sum | cut -c1-10)
 # Keep the run directory, manifest, and Slurm log names on Japan Standard Time.
