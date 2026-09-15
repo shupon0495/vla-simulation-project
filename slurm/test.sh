@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH --job-name=vla_eval
-#SBATCH --time=01:00:00
+#SBATCH --time=04:00:00
 #SBATCH --nodes=1
 #SBATCH --gpus=1
 
