@@ -12,6 +12,7 @@ SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 export PROJECT=${PROJECT:-$SCRIPT_DIR}
 # パスや環境変数を導入
 source "$PROJECT/slurm/config.sh"
+
 # uv のキャッシュをプロジェクト内に配置し、ログインノードと計算ノード間で共有する。
 # 計算ノードは --offline で uv run するため、キャッシュがプロジェクトの
 # バインドマウント配下にないと wheel が見つからず sdist からビルドされてしまう。
@@ -29,7 +30,6 @@ RUN_LOG_DIR="$LOG/$RUN_ID"
 export RUN_ID TIMESTAMP RUN_DIR RUN_LOG_DIR
 mkdir -p "$RUN_DIR/manifests" "$RUN_LOG_DIR"
 
->>>>>>> 476d2f52c13fc15e131624dc5ef7a4a19f6a88cc
 # ログインノードの環境によらずに環境構築をするためにコンテナ内でprepare-assetsを実行するようにする
 # もしSIFファイルが古い・存在しないならDEFファイルから作成する. もう既に存在するならスキップ
 if [ ! -f "$LOGIN_SIF" ] || [ "$LOGIN_DEF" -nt "$LOGIN_SIF" ]; then
