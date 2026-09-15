@@ -13,17 +13,16 @@ export PROJECT=${PROJECT:-$SCRIPT_DIR}
 # パスや環境変数を導入
 source "$PROJECT/slurm/config.sh"
 
-# ログディレクトリがないなら作成
-mkdir -p "$LOG"
-
 # RUN_IDを作成して公開
 RUN_ID=$(date +%s%N | sha256sum | cut -c1-10)
 # Keep the run directory, manifest, and Slurm log names on Japan Standard Time.
 # Include the numeric UTC offset so the timestamp remains unambiguous.
 TIMESTAMP=$(TZ=Asia/Tokyo date +%Y%m%dT%H%M%S%z)
 RUN_DIR="$PROJECT/data/outputs/${TIMESTAMP}-${RUN_ID}"
-export RUN_ID TIMESTAMP RUN_DIR
-mkdir -p "$RUN_DIR/manifests"
+# 同じRUN_IDのSlurmログは log/<RUN_ID>/ にまとめて保存する
+RUN_LOG_DIR="$LOG/$RUN_ID"
+export RUN_ID TIMESTAMP RUN_DIR RUN_LOG_DIR
+mkdir -p "$RUN_DIR/manifests" "$RUN_LOG_DIR"
 
 # ログインノードの環境によらずに環境構築をするためにコンテナ内でprepare-assetsを実行するようにする
 # もしSIFファイルが古い・存在しないならDEFファイルから作成する. もう既に存在するならスキップ
@@ -68,10 +67,10 @@ if [ ! -f "$SIF" ] || [ "$DEF" -nt "$SIF" ]; then
     echo "Building Singularity image..."
 
     BUILD_JOB=$(sbatch --parsable \
-        --export="ALL,PROJECT=$PROJECT,LOG=$LOG,RUN_ID=$RUN_ID,RUN_DIR=$RUN_DIR" \
+        --export="ALL,PROJECT=$PROJECT,LOG=$RUN_LOG_DIR,RUN_ID=$RUN_ID,RUN_DIR=$RUN_DIR" \
         --partition="$PPC_PARTITION" \
-        --output="$LOG/build-${TIMESTAMP}-%j.out" \
-        --error="$LOG/build-${TIMESTAMP}-%j.err" \
+        --output="$RUN_LOG_DIR/build-${TIMESTAMP}-%j.out" \
+        --error="$RUN_LOG_DIR/build-${TIMESTAMP}-%j.err" \
         "$PROJECT/slurm/build.sh"
     )
     BUILD_DEPENDENCY=(--dependency="afterok:$BUILD_JOB")
@@ -80,28 +79,28 @@ else
 fi
 
 JOB1=$(sbatch --parsable \
-    --export="ALL,PROJECT=$PROJECT,LOG=$LOG,RUN_ID=$RUN_ID,RUN_DIR=$RUN_DIR,HF_HOME=$PROJECT/data/hf_cache,HF_HUB_OFFLINE=1,HF_DATASETS_OFFLINE=1,TRANSFORMERS_OFFLINE=1" \
+    --export="ALL,PROJECT=$PROJECT,LOG=$RUN_LOG_DIR,RUN_ID=$RUN_ID,RUN_DIR=$RUN_DIR,HF_HOME=$PROJECT/data/hf_cache,HF_HUB_OFFLINE=1,HF_DATASETS_OFFLINE=1,TRANSFORMERS_OFFLINE=1" \
     --partition="$PPC_PARTITION" \
-    --output="$LOG/preprocess-${TIMESTAMP}-%j.out" \
-    --error="$LOG/preprocess-${TIMESTAMP}-%j.err" \
+    --output="$RUN_LOG_DIR/preprocess-${TIMESTAMP}-%j.out" \
+    --error="$RUN_LOG_DIR/preprocess-${TIMESTAMP}-%j.err" \
     "${BUILD_DEPENDENCY[@]}" \
     "$PROJECT/slurm/preprocess.sh"
 )
 
 JOB2=$(sbatch --parsable \
-    --export="ALL,PROJECT=$PROJECT,LOG=$LOG,RUN_ID=$RUN_ID,RUN_DIR=$RUN_DIR,HF_HOME=$PROJECT/data/hf_cache,HF_HUB_OFFLINE=1,HF_DATASETS_OFFLINE=1,TRANSFORMERS_OFFLINE=1" \
+    --export="ALL,PROJECT=$PROJECT,LOG=$RUN_LOG_DIR,RUN_ID=$RUN_ID,RUN_DIR=$RUN_DIR,HF_HOME=$PROJECT/data/hf_cache,HF_HUB_OFFLINE=1,HF_DATASETS_OFFLINE=1,TRANSFORMERS_OFFLINE=1" \
     --partition="$TRAIN_PARTITION" \
-    --output="$LOG/train-${TIMESTAMP}-%j.out" \
-    --error="$LOG/train-${TIMESTAMP}-%j.err" \
+    --output="$RUN_LOG_DIR/train-${TIMESTAMP}-%j.out" \
+    --error="$RUN_LOG_DIR/train-${TIMESTAMP}-%j.err" \
     --dependency="afterok:$JOB1" \
     "$PROJECT/slurm/train.sh"
 )
 
 JOB3=$(sbatch --parsable \
-    --export="ALL,PROJECT=$PROJECT,LOG=$LOG,RUN_ID=$RUN_ID,RUN_DIR=$RUN_DIR,HF_HOME=$PROJECT/data/hf_cache,HF_HUB_OFFLINE=1,HF_DATASETS_OFFLINE=1,TRANSFORMERS_OFFLINE=1" \
+    --export="ALL,PROJECT=$PROJECT,LOG=$RUN_LOG_DIR,RUN_ID=$RUN_ID,RUN_DIR=$RUN_DIR,HF_HOME=$PROJECT/data/hf_cache,HF_HUB_OFFLINE=1,HF_DATASETS_OFFLINE=1,TRANSFORMERS_OFFLINE=1" \
     --partition="$TEST_PARTITION" \
-    --output="$LOG/test-${TIMESTAMP}-%j.out" \
-    --error="$LOG/test-${TIMESTAMP}-%j.err" \
+    --output="$RUN_LOG_DIR/test-${TIMESTAMP}-%j.out" \
+    --error="$RUN_LOG_DIR/test-${TIMESTAMP}-%j.err" \
     --dependency="afterok:$JOB2" \
     "$PROJECT/slurm/test.sh"
 )
