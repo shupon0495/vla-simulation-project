@@ -42,16 +42,19 @@ fi
 # 計算ノード用 .venv は差分があるときだけ同期する
 # uv sync --check は環境が lockfile と一致していれば即座に成功終了するため、
 # 定常状態では CUDA を含む大きな wheel の再展開は起こらない
+# 計算ノード(ng-dgx-m2)は aarch64 だがログインノードは x86_64 のため、
+# --python-platform で計算ノード向けの wheel をキャッシュ・同期する
+COMPUTE_PLATFORM=aarch64-unknown-linux-gnu
 if ! singularity exec \
         --bind "$PROJECT:$PROJECT" \
         --pwd "$PROJECT" \
         "$LOGIN_SIF" \
-        uv sync --frozen --check; then
+        uv sync --frozen --check --python-platform "$COMPUTE_PLATFORM"; then
     singularity exec \
         --bind "$PROJECT:$PROJECT" \
         --pwd "$PROJECT" \
         "$LOGIN_SIF" \
-        uv sync --frozen
+        uv sync --frozen --python-platform "$COMPUTE_PLATFORM"
 fi
 
 # prepare-assets は login.sif 内蔵の最小Python環境( huggingface-hub + tqdm )で
