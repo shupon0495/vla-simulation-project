@@ -169,6 +169,7 @@ evaluation_started_at
 evaluation_finished_at
 suites
 episodes_per_task
+keep_all_videos
 results_csv_path
 video_paths
 ```
@@ -339,6 +340,14 @@ debugging と reproducibility のために保持します。
 各動画は、対応する suite の task ID 0 の rollout でなければなりません。
 
 suite ごとに、要求される最終動画は1つだけです。
+
+任意: `config/experiment.toml` の `evaluation.video.keep_all_videos = true` の場合、lerobot-eval が生成した中間 rollout 動画を削除せず、以下に追加アーティファクトとして保持して構いません。
+
+```text id="g2h0dr"
+eval/<suite>/videos/
+```
+
+これらは必須の4動画に追加されるものであり、必須の4動画の代替とはみなしません。`keep_all_videos = false`（既定）の場合、中間動画は test stage の完了前に削除してください。
 
 ---
 

@@ -43,6 +43,7 @@ class ExperimentConfig:
     episodes_per_task: int
     evaluation_seed: int
     video_task_id: int
+    video_keep_all: bool
     auto_select_enabled: bool
     auto_select_n_tasks: int
 
@@ -70,6 +71,7 @@ def load_config(project: Path) -> ExperimentConfig:
         episodes_per_task=e['episodes_per_task'],
         evaluation_seed=e['seed'],
         video_task_id=e['video']['task_id'],
+        video_keep_all=e['video'].get('keep_all_videos', False),
         auto_select_enabled=auto_select.get('enabled', False),
         auto_select_n_tasks=auto_select.get('n_tasks', 100),
     )

@@ -71,6 +71,12 @@ def prune_rendered_videos(output: Path, run: Path) -> None:
         raise ValueError(f'test: refusing to delete directory outside the run: {resolved}')
     shutil.rmtree(resolved)
 
+def retain_or_prune_videos(output: Path, run: Path, keep_all: bool) -> None:
+    """Keep lerobot-eval's rendered videos when ``keep_all`` is set, else prune them."""
+    if keep_all:
+        return
+    prune_rendered_videos(output, run)
+
 def evaluate() -> None:
     paths = ProjectPaths.from_environment()
     run = ensure_run_layout(paths)
@@ -113,13 +119,13 @@ def evaluate() -> None:
         rows.extend(result_rows(paths.run_id(), suite, info))
         target = run / f'{paths.run_id()}_{names[suite]}.mp4'
         shutil.copy2(_task_video(info, config.video_task_id, output), target)
-        prune_rendered_videos(output, run)
+        retain_or_prune_videos(output, run, config.video_keep_all)
         videos[suite] = str(target)
     results = run / f'{paths.run_id()}_results.csv'
     write_results_csv(results, rows)
     effective_task_ids = sorted(entry['task_id'] for suite_entries in task_selection.values() for entry in suite_entries) if config.auto_select_enabled and task_selection else list(config.task_ids)
     finished = datetime.now(timezone.utc)
-    write_json(run / 'manifests/test.json', {'run_id': paths.run_id(), 'stage': 'test', 'slurm_job_id': os.environ.get('SLURM_JOB_ID'), 'evaluation_started_at': started.isoformat(), 'evaluation_finished_at': finished.isoformat(), 'evaluation_elapsed_seconds': elapsed_seconds(started, finished), 'suites': list(SUITES), 'task_ids': effective_task_ids, 'episodes_per_task': config.episodes_per_task, 'results_csv_path': str(results), 'video_paths': videos, 'commands': commands})
+    write_json(run / 'manifests/test.json', {'run_id': paths.run_id(), 'stage': 'test', 'slurm_job_id': os.environ.get('SLURM_JOB_ID'), 'evaluation_started_at': started.isoformat(), 'evaluation_finished_at': finished.isoformat(), 'evaluation_elapsed_seconds': elapsed_seconds(started, finished), 'suites': list(SUITES), 'task_ids': effective_task_ids, 'episodes_per_task': config.episodes_per_task, 'keep_all_videos': config.video_keep_all, 'results_csv_path': str(results), 'video_paths': videos, 'commands': commands})
     validate_final_artifacts(run, paths.run_id(), SUITES)
     summary = finalize_run_timing(run, datetime.now(timezone.utc))
     print(f"Total pipeline elapsed time: {summary['total_elapsed_seconds']:.3f} seconds")

@@ -5,7 +5,7 @@ from pathlib import Path
 from types import SimpleNamespace
 import pytest
 from vla_simulation_project.artifacts import finalize_run_timing, result_rows, validate_final_artifacts, write_json, write_parameter_csv, write_results_csv
-from vla_simulation_project.evaluate import add_libero_source_to_pythonpath, build_eval_command, create_libero_config, prune_rendered_videos
+from vla_simulation_project.evaluate import add_libero_source_to_pythonpath, build_eval_command, create_libero_config, prune_rendered_videos, retain_or_prune_videos
 from vla_simulation_project.paths import ProjectPaths
 from vla_simulation_project.prepare_assets import _extract_assets, _localize_tokenizer_config, _link_libero_assets, _snapshot, tqdm, validate_assets
 from vla_simulation_project.preprocess import choose_evenly_spaced, normalize_task_name, select_spatial_episodes
@@ -14,7 +14,7 @@ from vla_simulation_project.train import build_train_command
 from vla_simulation_project.config import LIBERO_SOURCE_REPO, LIBERO_SOURCE_REVISION, SPATIAL_TASK_NAMES, ExperimentConfig, load_config
 
 def config():
-    return SimpleNamespace(steps=3000, batch_size=1, learning_rate=0.0003, final_learning_rate=3e-05, warmup_steps=100, lora_r=16, lora_alpha=16, log_freq=100, seed=42, chunk_size=50, n_action_steps=50, task_ids=(0, 4, 8), episodes_per_task=1, evaluation_seed=2026, video_task_id=0, auto_select_enabled=False, auto_select_n_tasks=100)
+    return SimpleNamespace(steps=3000, batch_size=1, learning_rate=0.0003, final_learning_rate=3e-05, warmup_steps=100, lora_r=16, lora_alpha=16, log_freq=100, seed=42, chunk_size=50, n_action_steps=50, task_ids=(0, 4, 8), episodes_per_task=1, evaluation_seed=2026, video_task_id=0, video_keep_all=False, auto_select_enabled=False, auto_select_n_tasks=100)
 
 def test_run_path_and_run_id(monkeypatch, tmp_path):
     run = tmp_path / 'data/outputs/20260910T000000Z-ab12'
@@ -178,6 +178,36 @@ def _classification_fixture():
             tasks.append({'id': task_id, 'name': f'task_{task_id}', 'category': cat, 'difficulty_level': (task_id % 5) + 1})
             task_id += 1
     return {'libero_spatial': tasks}
+
+
+def test_retain_or_prune_videos_keeps_rendered_videos_when_enabled(tmp_path):
+    run = tmp_path / 'run'
+    videos = run / 'eval/libero_spatial/videos/libero_spatial_0'
+    videos.mkdir(parents=True)
+    (videos / 'eval_episode_0.mp4').write_text('x')
+    output = run / 'eval/libero_spatial'
+    retain_or_prune_videos(output, run, keep_all=True)
+    assert (videos / 'eval_episode_0.mp4').is_file()
+    retain_or_prune_videos(output, run, keep_all=False)
+    assert not (run / 'eval/libero_spatial/videos').exists()
+
+
+def _write_experiment_toml(project: Path, video_section: str) -> None:
+    config_dir = project / 'config'
+    config_dir.mkdir(parents=True, exist_ok=True)
+    (config_dir / 'experiment.toml').write_text(
+        '[training]\nsteps = 3000\nbatch_size = 1\nlearning_rate = 3e-4\nfinal_learning_rate = 3e-5\nwarmup_steps = 100\nlora_r = 16\nlora_alpha = 16\nlog_freq = 100\nseed = 42\n'
+        '[evaluation]\ntask_ids = [0, 4, 8]\nepisodes_per_task = 1\nseed = 2026\n'
+        f'[evaluation.video]\n{video_section}',
+        encoding='utf-8',
+    )
+
+
+def test_load_config_reads_keep_all_videos(tmp_path):
+    _write_experiment_toml(tmp_path, 'task_id = 0\n')
+    assert load_config(tmp_path).video_keep_all is False
+    _write_experiment_toml(tmp_path, 'task_id = 0\nkeep_all_videos = true\n')
+    assert load_config(tmp_path).video_keep_all is True
 
 
 def test_select_tasks_returns_100_entries_per_suite():

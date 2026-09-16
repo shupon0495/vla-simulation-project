@@ -24,3 +24,4 @@ n_tasks = 100
 
 [evaluation.video]
 task_id = 0
+keep_all_videos = false
