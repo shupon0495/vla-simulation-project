@@ -47,6 +47,7 @@ Slurm job ID は、`RUN_ID` とは別の識別子です。
 
 ```text id="bsc528"
 data/outputs/<timestamp>-<RUN_ID>/
+├── experiment.toml
 ├── <RUN_ID>_model.tar.gz
 ├── <RUN_ID>_parameters.csv
 ├── <RUN_ID>_results.csv
@@ -70,6 +71,8 @@ data/outputs/<timestamp>-<RUN_ID>/
     ├── train.json
     └── test.json
 ```
+
+`experiment.toml` は、パイプライン投入時に `submit_pipeline.sh` が `config/experiment.toml` からコピーしたスナップショットです。これが compute stage (`train` / `test`) が読み込む実験設定の正源であり、実験設定の値自体は `manifests/train.json` の `experiment_config` にも記録されます。
 
 LeRobot が生成する生の evaluation output は、各 suite directory 内に保持して構いません。
 

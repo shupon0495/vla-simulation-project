@@ -30,6 +30,11 @@ RUN_LOG_DIR="$LOG/$RUN_ID"
 export RUN_ID TIMESTAMP RUN_DIR RUN_LOG_DIR
 mkdir -p "$RUN_DIR/manifests" "$RUN_LOG_DIR"
 
+# 投入時点の実験設定を run ディレクトリへ固定する。
+# train/test はこのスナップショットからのみ読み込むため、
+# 投入後に config/experiment.toml を変更してもキュー済み job には影響しない。
+cp "$PROJECT/config/experiment.toml" "$RUN_DIR/experiment.toml"
+
 # ログインノードの環境によらずに環境構築をするためにコンテナ内でprepare-assetsを実行するようにする
 # もしSIFファイルが古い・存在しないならDEFファイルから作成する. もう既に存在するならスキップ
 if [ ! -f "$LOGIN_SIF" ] || [ "$LOGIN_DEF" -nt "$LOGIN_SIF" ]; then

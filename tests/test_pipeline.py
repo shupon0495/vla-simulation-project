@@ -192,15 +192,23 @@ def test_retain_or_prune_videos_keeps_rendered_videos_when_enabled(tmp_path):
     assert not (run / 'eval/libero_spatial/videos').exists()
 
 
+def _experiment_toml_text(video_section: str) -> str:
+    return (
+        '[training]\nsteps = 3000\nbatch_size = 1\nlearning_rate = 3e-4\nfinal_learning_rate = 3e-5\nwarmup_steps = 100\nlora_r = 16\nlora_alpha = 16\nlog_freq = 100\nseed = 42\n'
+        '[evaluation]\ntask_ids = [0, 4, 8]\nepisodes_per_task = 1\nseed = 2026\n'
+        f'[evaluation.video]\n{video_section}'
+    )
+
+
 def _write_experiment_toml(project: Path, video_section: str) -> None:
     config_dir = project / 'config'
     config_dir.mkdir(parents=True, exist_ok=True)
-    (config_dir / 'experiment.toml').write_text(
-        '[training]\nsteps = 3000\nbatch_size = 1\nlearning_rate = 3e-4\nfinal_learning_rate = 3e-5\nwarmup_steps = 100\nlora_r = 16\nlora_alpha = 16\nlog_freq = 100\nseed = 42\n'
-        '[evaluation]\ntask_ids = [0, 4, 8]\nepisodes_per_task = 1\nseed = 2026\n'
-        f'[evaluation.video]\n{video_section}',
-        encoding='utf-8',
-    )
+    (config_dir / 'experiment.toml').write_text(_experiment_toml_text(video_section), encoding='utf-8')
+
+
+def _write_run_toml(run: Path, video_section: str) -> None:
+    run.mkdir(parents=True, exist_ok=True)
+    (run / 'experiment.toml').write_text(_experiment_toml_text(video_section), encoding='utf-8')
 
 
 def test_load_config_reads_keep_all_videos(tmp_path):
@@ -208,6 +216,24 @@ def test_load_config_reads_keep_all_videos(tmp_path):
     assert load_config(tmp_path).video_keep_all is False
     _write_experiment_toml(tmp_path, 'task_id = 0\nkeep_all_videos = true\n')
     assert load_config(tmp_path).video_keep_all is True
+
+
+def test_load_config_uses_pinned_run_snapshot(tmp_path):
+    project = tmp_path / 'project'
+    run = tmp_path / 'run'
+    _write_experiment_toml(project, 'task_id = 0\n')
+    _write_run_toml(run, 'task_id = 0\nkeep_all_videos = true\n')
+    assert load_config(project, run).video_keep_all is True
+    # Editing the source config after pinning must not affect the run.
+    _write_experiment_toml(project, 'task_id = 0\nkeep_all_videos = false\n')
+    assert load_config(project, run).video_keep_all is True
+
+
+def test_load_config_requires_pinned_run_snapshot(tmp_path):
+    project = tmp_path / 'project'
+    _write_experiment_toml(project, 'task_id = 0\n')
+    with pytest.raises(FileNotFoundError, match='pinned experiment config'):
+        load_config(project, tmp_path / 'run')
 
 
 def test_select_tasks_returns_100_entries_per_suite():

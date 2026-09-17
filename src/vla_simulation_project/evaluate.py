@@ -87,7 +87,7 @@ def evaluate() -> None:
         raise ValueError('test: train manifest RUN_ID mismatch')
     policy = run / 'model' / f'{paths.run_id()}_smolvla'
     validate_policy_directory(policy)
-    config = load_config(paths.project)
+    config = load_config(paths.project, run)
     env = offline_environment(paths)
     env['MUJOCO_GL'] = 'egl'
     env['_LEROBOT_PYTHON'] = sys.executable

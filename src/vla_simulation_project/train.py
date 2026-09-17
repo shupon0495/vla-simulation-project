@@ -79,7 +79,7 @@ def train() -> None:
     pre = read_json(run / 'manifests/preprocess.json')
     if pre.get('run_id') != paths.run_id():
         raise ValueError('train: preprocess manifest RUN_ID mismatch')
-    config = load_config(paths.project)
+    config = load_config(paths.project, run)
     command = build_train_command(config, pre, run)
     run_command('train', command, cwd=paths.project, env=offline_environment(paths))
     checkpoint = run / 'training/checkpoints' / f'{config.steps:06d}' / 'pretrained_model'

@@ -48,10 +48,17 @@ class ExperimentConfig:
     auto_select_n_tasks: int
 
 
-def load_config(project: Path) -> ExperimentConfig:
-    raw = tomllib.loads(
-        (project / 'config/experiment.toml').read_text(encoding='utf-8')
-    )
+def load_config(project: Path, run: Path | None = None) -> ExperimentConfig:
+    if run is None:
+        source = project / 'config/experiment.toml'
+    else:
+        source = run / 'experiment.toml'
+        if not source.is_file():
+            raise FileNotFoundError(
+                f'load_config: pinned experiment config snapshot missing at {source}; '
+                'submit jobs through submit_pipeline.sh so the config is pinned at submission time'
+            )
+    raw = tomllib.loads(source.read_text(encoding='utf-8'))
     t, e = (raw['training'], raw['evaluation'])
     policy = t.get('policy', {})
     auto_select = e.get('auto_select', {})

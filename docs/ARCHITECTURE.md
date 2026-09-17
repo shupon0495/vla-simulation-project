@@ -186,6 +186,7 @@ python -m vla_simulation_project.main test
 責務:
 
 * `config/experiment.toml` の読み込み
+* compute stage (`train` / `test`) では、`submit_pipeline.sh` が投入時に run ディレクトリへ固定した `experiment.toml` スナップショットを読み込む
 * 実験パラメータの検証
 * 各 stage へ型付けされた configuration を提供する
 
@@ -315,6 +316,9 @@ Experiment configuration は以下に配置します。
 ```text
 config/experiment.toml
 ```
+
+`submit_pipeline.sh` は投虫時点の内容を `data/outputs/<timestamp>-<RUN_ID>/experiment.toml` へスナップショットします。
+`train` / `test` の compute stage はこのスナップショットからのみ設定を読み込むため、投入後に `config/experiment.toml` を変更してもキュー済みの run には影響しません。スナップショットが存在しない場合、compute stage は原因が分かる形で失敗します。
 
 変更可能な値の例:
 
