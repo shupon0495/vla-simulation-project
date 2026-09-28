@@ -1,0 +1,34 @@
+Bootstrap: docker
+From: ubuntu:24.04
+
+%labels
+    Description "Python 3.12 login-node image for offline asset preparation"
+
+%post
+    set -eux
+    export DEBIAN_FRONTEND=noninteractive
+
+    apt-get update
+    apt-get install -y --no-install-recommends ca-certificates python3.12-dev build-essential curl git
+    curl -LsSf https://astral.sh/uv/install.sh \
+        | env UV_UNMANAGED_INSTALL=/usr/local/bin sh
+    rm -rf /var/lib/apt/lists/*
+
+    # prepare-assets 専用の最小環境をイメージに組み込む。
+    # プロジェクトの .venv（CUDA を含む重い依存）は読み込まない。
+    # バージョン範囲は pyproject.toml の制約と揃える。
+    # システム Python は Debian の externally-managed 配下にあるため、
+    # --break-system-packages を付けて明示的にイメージ内へインストールする。
+    # イメージは使い捨ての隔離環境であり、ホストの Python には影響しない。
+    uv pip install --system --break-system-packages --python /usr/bin/python3.12 \
+        "huggingface-hub>=1.0.0,<2.0.0" "tqdm>=4.66.0,<5.0.0"
+
+%environment
+    PATH="/usr/local/bin:$PATH"
+
+%test
+    python3.12 -c 'import tomllib'
+    python3.12 -c 'import huggingface_hub, tqdm'
+
+%runscript
+    exec python3.12 "$@"

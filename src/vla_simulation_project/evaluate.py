@@ -1,0 +1,131 @@
+from __future__ import annotations
+import json, os, shutil, sys
+from datetime import datetime, timezone
+from pathlib import Path
+from .artifacts import elapsed_seconds, finalize_run_timing, read_json, result_rows, validate_final_artifacts, validate_policy_directory, write_json, write_results_csv
+from .config import SUITES, ExperimentConfig, load_config
+from .paths import ProjectPaths, ensure_run_layout
+from .prepare_assets import _resource_root, validate_assets
+from .subprocess_utils import run_command
+from .train import offline_environment
+CAMERAS = {'agentview_image': 'front', 'robot0_eye_in_hand_image': 'wrist'}
+
+
+def add_libero_source_to_pythonpath(env: dict[str, str], source: Path) -> None:
+    """Expose the prepared LIBERO-plus namespace package to lerobot-eval.
+
+    The locked LIBERO-plus revision does not package its outer ``libero``
+    namespace into a wheel.  Its validated login-node checkout is therefore
+    the offline import source used by the evaluation subprocess.
+    """
+    existing = env.get('PYTHONPATH')
+    env['PYTHONPATH'] = str(source) if not existing else f'{source}{os.pathsep}{existing}'
+
+
+def build_eval_command(policy: Path, output: Path, suite: str, config: ExperimentConfig, vlm_path: Path, task_ids: list[int] | None = None) -> list[str]:
+    effective_ids = task_ids if task_ids is not None else list(config.task_ids)
+    python_cmd = os.environ.get('_LEROBOT_PYTHON', sys.executable)
+    return [python_cmd, '-m', 'vla_simulation_project._lerobot_eval', f'--policy.path={policy}', f'--policy.vlm_model_name={vlm_path}', '--policy.device=cuda', '--policy.use_amp=false', '--env.type=libero', '--env.is_libero_plus=true', f'--env.task={suite}', '--env.task_ids=' + json.dumps(effective_ids, separators=(',', ':')), '--env.camera_name_mapping=' + json.dumps(CAMERAS, separators=(',', ':')), '--env.observation_height=256', '--env.observation_width=256', '--env.control_mode=relative', '--env.max_parallel_tasks=1', '--eval.batch_size=1', f'--eval.n_episodes={config.episodes_per_task}', '--eval.use_async_envs=false', '--eval.recording=false', f'--seed={config.evaluation_seed}', f'--output_dir={output}']
+
+def create_libero_config(run: Path, source: Path, assets: Path) -> Path:
+    """Configure uv-managed LIBERO Python to use login-prepared benchmark data."""
+    resources = _resource_root(source)
+    if not (resources / 'bddl_files').is_dir() or not (resources / 'init_files').is_dir():
+        raise FileNotFoundError(f'test: prepared LIBERO-plus benchmark resources are incomplete under {resources}')
+    if not assets.is_dir():
+        raise FileNotFoundError(f'test: prepared LIBERO-plus assets are missing at {assets}')
+    config_dir = run / 'libero_config'
+    config_dir.mkdir(parents=True, exist_ok=True)
+    content = '\n'.join((f'benchmark_root: {resources}', f'assets: {assets}', f'bddl_files: {resources / 'bddl_files'}', f'datasets: {resources.parent / 'datasets'}', f'init_states: {resources / 'init_files'}')) + '\n'
+    (config_dir / 'config.yaml').write_text(content, encoding='utf-8')
+    return config_dir
+
+def _task_video(info: dict, task_id: int, output: Path) -> Path:
+    for task in info.get('per_task', []):
+        if int(task.get('task_id', -1)) == task_id:
+            paths = task.get('metrics', {}).get('video_paths', [])
+            if paths:
+                candidate = Path(paths[0])
+                for possible in (candidate, output / candidate):
+                    if possible.is_file() and possible.stat().st_size:
+                        return possible
+    directory = output / 'videos' / f'{info.get('task_group', '')}_{task_id}'
+    candidates = sorted(directory.rglob('*.mp4')) if directory.is_dir() else []
+    if not candidates:
+        raise FileNotFoundError(f'test: evaluation did not produce a video for task {task_id} under {output}')
+    return candidates[0]
+
+def prune_rendered_videos(output: Path, run: Path) -> None:
+    """Delete lerobot-eval's intermediate rendered videos for one suite.
+
+    lerobot-eval renders up to ``max_episodes_rendered`` videos per task, but
+    the artifact contract requires exactly one final video per suite, which is
+    copied to the run root before this cleanup.  Deletion is refused for any
+    path outside the run directory.
+    """
+    videos = output / 'videos'
+    if not videos.is_dir():
+        return
+    resolved, root = (videos.resolve(), run.resolve())
+    if resolved == root or not resolved.is_relative_to(root):
+        raise ValueError(f'test: refusing to delete directory outside the run: {resolved}')
+    shutil.rmtree(resolved)
+
+def retain_or_prune_videos(output: Path, run: Path, keep_all: bool) -> None:
+    """Keep lerobot-eval's rendered videos when ``keep_all`` is set, else prune them."""
+    if keep_all:
+        return
+    prune_rendered_videos(output, run)
+
+def evaluate() -> None:
+    paths = ProjectPaths.from_environment()
+    run = ensure_run_layout(paths)
+    started = datetime.now(timezone.utc)
+    lock = validate_assets(paths)
+    train_manifest = read_json(run / 'manifests/train.json')
+    if train_manifest.get('run_id') != paths.run_id():
+        raise ValueError('test: train manifest RUN_ID mismatch')
+    policy = run / 'model' / f'{paths.run_id()}_smolvla'
+    validate_policy_directory(policy)
+    config = load_config(paths.project, run)
+    env = offline_environment(paths)
+    env['MUJOCO_GL'] = 'egl'
+    env['_LEROBOT_PYTHON'] = sys.executable
+    libero_source = paths.project / lock['libero_source']['local_path']
+    vlm_path = paths.project / lock['vlm']['local_path']
+    env['LIBERO_CONFIG_PATH'] = str(create_libero_config(run, libero_source, paths.project / lock['libero_assets']['local_path']))
+    add_libero_source_to_pythonpath(env, libero_source)
+
+    task_selection = None
+    if config.auto_select_enabled:
+        from .select_tasks import load_task_classification, select_tasks, TASK_CLASSIFICATION_FILENAME
+        classification_path = _resource_root(libero_source) / 'benchmark' / TASK_CLASSIFICATION_FILENAME
+        classification = load_task_classification(classification_path)
+        task_selection = {suite: select_tasks(classification[suite], config.auto_select_n_tasks) for suite in SUITES}
+        write_json(run / 'task_selection.json', task_selection)
+
+    rows, videos, commands = ([], {}, {})
+    names = {'libero_spatial': 'spatial', 'libero_object': 'object', 'libero_goal': 'goal', 'libero_10': 'libero10'}
+    for suite in SUITES:
+        output = run / 'eval' / suite
+        if config.auto_select_enabled and task_selection:
+            selected_ids = sorted(entry['task_id'] for entry in task_selection[suite])
+            command = build_eval_command(policy, output, suite, config, vlm_path, task_ids=selected_ids)
+        else:
+            command = build_eval_command(policy, output, suite, config, vlm_path)
+        commands[suite] = command
+        run_command('test', command, cwd=paths.project, env=env)
+        info = read_json(output / 'eval_info.json')
+        rows.extend(result_rows(paths.run_id(), suite, info))
+        target = run / f'{paths.run_id()}_{names[suite]}.mp4'
+        shutil.copy2(_task_video(info, config.video_task_id, output), target)
+        retain_or_prune_videos(output, run, config.video_keep_all)
+        videos[suite] = str(target)
+    results = run / f'{paths.run_id()}_results.csv'
+    write_results_csv(results, rows)
+    effective_task_ids = sorted(entry['task_id'] for suite_entries in task_selection.values() for entry in suite_entries) if config.auto_select_enabled and task_selection else list(config.task_ids)
+    finished = datetime.now(timezone.utc)
+    write_json(run / 'manifests/test.json', {'run_id': paths.run_id(), 'stage': 'test', 'slurm_job_id': os.environ.get('SLURM_JOB_ID'), 'evaluation_started_at': started.isoformat(), 'evaluation_finished_at': finished.isoformat(), 'evaluation_elapsed_seconds': elapsed_seconds(started, finished), 'suites': list(SUITES), 'task_ids': effective_task_ids, 'episodes_per_task': config.episodes_per_task, 'keep_all_videos': config.video_keep_all, 'results_csv_path': str(results), 'video_paths': videos, 'commands': commands})
+    validate_final_artifacts(run, paths.run_id(), SUITES)
+    summary = finalize_run_timing(run, datetime.now(timezone.utc))
+    print(f"Total pipeline elapsed time: {summary['total_elapsed_seconds']:.3f} seconds")

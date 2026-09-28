@@ -1,6 +1,9 @@
 export DEF=$PROJECT/singularity/ubuntu24.04.def
 export SIF=$PROJECT/singularity/ubuntu24.04.sif
+export LOGIN_DEF=$PROJECT/singularity/login.def
+export LOGIN_SIF=$PROJECT/singularity/login.sif
 export LOG=$PROJECT/log
 export PPC_PARTITION=ng-dgx-m2
 export TRAIN_PARTITION=ng-dgx-m2
 export TEST_PARTITION=ng-dgx-m2
+export UV_LINK_MODE=copy

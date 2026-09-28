@@ -1,7 +1,8 @@
 #!/bin/bash
-#SBATCH --job-name=train
-#SBATCH --time=00:10:00
+#SBATCH --job-name=LoRA_train
+#SBATCH --time=02:00:00
 #SBATCH --nodes=1
+#SBATCH --gpus=1
 
 set -euo pipefail
 
@@ -10,5 +11,5 @@ export PROJECT=${PROJECT:-$(cd "$SCRIPT_DIR/.." && pwd)}
 source "$PROJECT/slurm/config.sh"
 
 cd "$PROJECT"
-singularity exec --bind "$PROJECT:$PROJECT" --pwd "$PROJECT" "$SIF" \
-    uv run python -m vla_simulation_project.main
+singularity exec --nv --bind "$PROJECT:$PROJECT" --pwd "$PROJECT" "$SIF" \
+    uv run --frozen --offline python -m vla_simulation_project.main train

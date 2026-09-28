@@ -1,6 +1,6 @@
 #!/bin/bash
-#SBATCH --job-name=preprocess
-#SBATCH --time=00:10:00
+#SBATCH --job-name=prepro
+#SBATCH --time=01:00:00
 #SBATCH --nodes=1
 
 set -euo pipefail
@@ -10,5 +10,5 @@ export PROJECT=${PROJECT:-$(cd "$SCRIPT_DIR/.." && pwd)}
 source "$PROJECT/slurm/config.sh"
 
 cd "$PROJECT"
-singularity exec --bind "$PROJECT:$PROJECT" --pwd "$PROJECT" "$SIF" \
-    uv run python -m vla_simulation_project.main
+singularity exec --nv --bind "$PROJECT:$PROJECT" --pwd "$PROJECT" "$SIF" \
+    uv run --frozen --offline python -m vla_simulation_project.main preprocess

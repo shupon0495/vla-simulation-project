@@ -1,7 +1,8 @@
 #!/bin/bash
-#SBATCH --job-name=test
-#SBATCH --time=00:10:00
+#SBATCH --job-name=vla_eval
+#SBATCH --time=04:00:00
 #SBATCH --nodes=1
+#SBATCH --gpus=1
 
 set -euo pipefail
 
@@ -10,5 +11,9 @@ export PROJECT=${PROJECT:-$(cd "$SCRIPT_DIR/.." && pwd)}
 source "$PROJECT/slurm/config.sh"
 
 cd "$PROJECT"
-singularity exec --bind "$PROJECT:$PROJECT" --pwd "$PROJECT" "$SIF" \
-    uv run python -m vla_simulation_project.main
+singularity exec --nv \
+    --bind "$PROJECT:$PROJECT" \
+    --bind /usr/share/glvnd/egl_vendor.d:/usr/share/glvnd/egl_vendor.d:ro \
+    --env __EGL_VENDOR_LIBRARY_FILENAMES=/usr/share/glvnd/egl_vendor.d/10_nvidia.json \
+    --pwd "$PROJECT" "$SIF" \
+    uv run --frozen --offline python -m vla_simulation_project.main test
